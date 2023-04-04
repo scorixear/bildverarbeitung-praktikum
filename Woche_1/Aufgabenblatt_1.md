@@ -50,7 +50,7 @@ XXXX<br>
 Plotte das Endergebnis mit Matplotlib als ein Bild.
 
 ### 2.1 Hilfestellung
-Auch hier kommt Numpy zur Rettung. Bei der Verarbeitung von Bildern werden wir in fast allen Übungen - mit Pillow/Matplotlib das Bild einlesen - mit Numpy das Bild verändern - mit Matplotlib das Bild ausgeben. Deshalb brauchen wir nur eine Methode, Numpy Arrays zu konkatinieren 🤨.
+Auch hier kommt Numpy zur Rettung. Bei der Verarbeitung von Bildern werden wir in fast allen Übungen - mit Pillow/Matplotlib das Bild einlesen - mit Numpy das Bild verändern - mit Matplotlib das Bild ausgeben. Deshalb brauchen wir nur eine Methode, Numpy Arrays zu konkatinieren.
 ## 3. Cropping
 Erweitere dein Programm um eine Funktion, die das Bild nun ausschneidet.
 Hierbei sollte man sowohl Start- als auch Endposition in vertikaler und horizontaler Position angeben können.
