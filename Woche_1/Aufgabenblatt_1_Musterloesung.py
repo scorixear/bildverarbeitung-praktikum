@@ -1,40 +1,51 @@
+#------------------------------------------------#
+#
+# Aufgabenblatt 1 - Musterlösung
+# 14.04.2023
+# Paul Keller
+#
+#------------------------------------------------#
 # Imports
 import matplotlib.pyplot as plt # used for showing the pictures
 import numpy as np # used for transforming the pictures
 from PIL import Image # used for reading the pictures
 
 def main():
-    # 1. Show Pictures
+    # --------- 1. Show Pictures ---------
     # files are always searched locally, meaning from the current working directory
     # The current working directory is always from where the python file is executed
     # = the folder you have open in VS Code
     # so in this case the python file is inside a folder called Woche_1
+    # and executed from the parent folder
     image = Image.open("Woche_1/test.jpg")
 
-    # converts an image to a numpy array, while casting every value
+    # converts an image to a numpy array, while casting each value
     # (color of each pixel) to a byte (uint8)
     numpy_data = np.asarray(image, dtype=np.uint8)
+    show_img(numpy_data)
+
+    # --------- 2. Tiling ----------
+    # tiles the image 3 times in the y direction (rows) and 4 times in the x direction (cols)
+    tiled_image = tile_image(numpy_data, 3, 4)
+    show_img(tiled_image)
+
+    # --------- 3. Cropping ----------
+    # crops the image from (100, 100) to (200, 200)
+    cropped_image = crop(numpy_data, 100, 100, 200, 200)
+    show_img(cropped_image)
+
+def show_img(image: np.ndarray):
+    """Shows an image
+
+    Args:
+        image (np.ndarray): the image to show
+    """
     # removes the axis from the plot
     plt.axis("off")
     # draws the numpy array to the plot
-    plt.imshow(numpy_data)
+    plt.imshow(image)
     # shows the plot
     plt.show()
-
-    # 2. Tiling
-    # tiles the image 3 times in the y direction (rows) and 4 times in the x direction (cols)
-    tiled_image = tile_image(numpy_data, 3, 4)
-    plt.axis("off")
-    plt.imshow(tiled_image)
-    plt.show()
-
-    # 3.
-    # crops the image from (100, 100) to (200, 200)
-    cropped_image = crop(numpy_data, 100, 100, 200, 200)
-    plt.axis("off")
-    plt.imshow(cropped_image)
-    plt.show()
-
 
 def tile_image(image: np.ndarray, rows: int, cols: int) -> np.ndarray:
     """Tiles an image, by repeating it in the x and y direction
@@ -57,7 +68,7 @@ def tile_image(image: np.ndarray, rows: int, cols: int) -> np.ndarray:
         for _ in range(cols):
             lst_images.append(image)
         tiled_image: np.ndarray = np.concatenate(lst_images, axis=1)
-    # if the number of rows is bigger than 1, we concatenate the image cols times in the y direction
+    # if the number of rows is bigger than 1, we concatenate the image rows times in the y direction
     if rows > 1:
         lst_images = []
         for _ in range(rows):
@@ -79,10 +90,10 @@ def crop(image: np.ndarray, x1: int, y1: int, x2: int, y2: int) -> np.ndarray:
     Returns:
         np.ndarray: the cropped image
     """
-    # the image is a 3d array, the np array indexing provides a
+    # the image is a 3-dimensional array, the np array indexing provides a
     # concise way to access every dimension [y, x, color]
     # we don't need to change the color dimension, so we leave it out
-    # the ':' means we want to access all values between both values
+    # the ':' means we want to access all cells / arrays between both values
     # [a:b] -> [a, a+1, a+2, ..., b-1]
     cropped_image = image[y1:y2, x1:x2]
     return cropped_image
