@@ -127,7 +127,7 @@ def color_interpolate_rgb(color1_name: str, color2_name: str, mix: float):
     cie_color2 = np.dot(color2, RGB_TO_CIE)
     # calculate the difference between the two colors
     # this can be extended, by not choosing a direct path between the two colors
-    # but choosing a path is more at the edge of the CIE color space
+    # but choosing a path that is more at the edge of the CIE color space
     cie_diff = cie_color2 - cie_color1
     # apply interpolation, by adding the color difference multiplied with a given percentage
     # and convert back to rgb
@@ -149,9 +149,9 @@ def color_interpolate_hsv(color1_name: str, color2_name: str, mix: float):
     color1 = np.array(mpl.colors.rgb_to_hsv(mpl.colors.to_rgb(color1_name)))
     color2 = np.array(mpl.colors.rgb_to_hsv(mpl.colors.to_rgb(color2_name)))
     # calculate the difference between the two colors
-    value_diff = color2[2] - color1[2]
-    saturation_diff = color2[1] - color1[1]
     color_diff = color2[0] - color1[0]
+    saturation_diff = color2[1] - color1[1]
+    value_diff = color2[2] - color1[2]
     # if the difference is larger than 0.5, we need to take the other direction
     if color_diff > 0.5:
         # calculate the correct difference
