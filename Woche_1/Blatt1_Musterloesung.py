@@ -14,6 +14,17 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 import numpy as np
 
+# the following two matricies are used to convert between RGB and CIE XYZ
+# the conversion is done by multiplying the RGB values with the RGB_TO_CIE matrix
+# or by multiplying the CIE XYZ values with the CIE_TO_RGB matrix
+# the values are taken from http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
+# and represent the "Best RGB" conversion
+RGB_TO_CIE = np.array([
+    [0.6326696,  0.2045558,  0.1269946],
+    [0.2284569,  0.7373523,  0.0341908],
+    [0.0000000,  0.0095142,  0.8156958]])
+CIE_TO_RGB = np.linalg.inv(RGB_TO_CIE)
+
 def main():
     # --------- 1. Grayscale Transformation ----------
     # reads in the image as a numpy array
@@ -46,20 +57,25 @@ def main():
     # This means, we can interpolate between two colors by interpolating between the Hue values
     # while keeping the saturation and lightness constant.
 
-    # In RGB we need to interpolate for each color channel. This will result in a more "bland" color interpolation,
-    # since we are essentially just adjusting each channel in the correct direction without using the color wheel.
+    # In RGB in order to interpolate correctly, we need to convert the colors to CIE XYZ space
+    # and then interpolate between the X, Y and Z values.
+    # To convert between RGB and CIE XYZ, we can choose a number of conversion matricies.
+    # In this example, the "Best RGB" from http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
+    # is chosen.
+    # Afterwards, we need to convert the result back to RGB space.
+    # This will result in a different, but more "bland" output than using the HSV interpolation.
 
-    # In HSV, we will get more colors in between (such as violet in this example), since the Hue
+    # In HSV, we will get more colors in between (such as cyan blue in this example), since the Hue
     # value is already an "interpolation" in the color wheel
     # Although it is important to note, that we can interpolate in two directions (directly and indirectly with wrap around from 0 to 1)
     # Therefore, we need to check which distance is shortest and choose it.
 
-    # In practice, when interpolating between colors, one should always choose the HSV way
-    # since it gives better/more realistic results.
+    # In practice, when interpolating between colors, you generally choose HSV, as it is less complex to implement and outputs nice colors.
+    # For a highly adjustable interpolation, better performance and more work, choose RGB.
 
     # define two colors to interpolate between
-    color1 = "blue"
-    color2 = "red"
+    color1 = "magenta"
+    color2 = "darkgreen"
     # define size of the image
     max_y = 50
     max_x = 100
@@ -106,8 +122,16 @@ def color_interpolate_rgb(color1_name: str, color2_name: str, mix: float):
     # convert both color names to rgb values
     color1 = np.array(mpl.colors.to_rgb(color1_name))
     color2 = np.array(mpl.colors.to_rgb(color2_name))
-    # apply interpolation, by adding both colors multiplied with a given percentage
-    return (1-mix)*color1 + mix*color2
+    # convert each color to cie xyz space
+    cie_color1 = np.dot(color1, RGB_TO_CIE)
+    cie_color2 = np.dot(color2, RGB_TO_CIE)
+    # calculate the difference between the two colors
+    # this can be extended, by not choosing a direct path between the two colors
+    # but choosing a path is more at the edge of the CIE color space
+    cie_diff = cie_color2 - cie_color1
+    # apply interpolation, by adding the color difference multiplied with a given percentage
+    # and convert back to rgb
+    return np.dot(cie_color1 + cie_diff * mix, CIE_TO_RGB)
 
 def color_interpolate_hsv(color1_name: str, color2_name: str, mix: float):
     """Interpolates between two colors in HSV space
@@ -124,24 +148,36 @@ def color_interpolate_hsv(color1_name: str, color2_name: str, mix: float):
     # since there is no color name to hsv function
     color1 = np.array(mpl.colors.rgb_to_hsv(mpl.colors.to_rgb(color1_name)))
     color2 = np.array(mpl.colors.rgb_to_hsv(mpl.colors.to_rgb(color2_name)))
-    # if the first color is smaller than the second color
-    if color1[0] < color2[0]:
-        # if the distance between the two colors is bigger than
-        # the distance between [the first color and 0] + [the second color and 1] ( [0..color1...color2..1] )
-        if 1-color2[0]+color1[0] < color2[0]-color1[0]:
-            # add 1 to the first color, moving it to the right [0..color2...1...color1..2]
-            # this exploits the fact, that hue values wrap around, meaning 1.5 is the same as 0.5
-            color1[0] += 1
-    # if the second color is smaller than the first color
+    # calculate the difference between the two colors
+    value_diff = color2[2] - color1[2]
+    saturation_diff = color2[1] - color1[1]
+    color_diff = color2[0] - color1[0]
+    # if the difference is larger than 0.5, we need to take the other direction
+    if color_diff > 0.5:
+        # calculate the correct difference
+        color_diff = 1 - color_diff
+        # apply interpolation, by adding the color difference multiplied with a given percentage (this might result in <0)
+        new_color = color1[0] - color_diff * mix
+    # if the difference is smaller than -0.5, we need to take the other direction
+    elif color_diff < -0.5:
+        # calculate the correct difference
+        color_diff = -1 - color_diff
+        # apply interpolation, by adding the color difference multiplied with a given percentage (this might result in >1)
+        new_color = color1[0] - color_diff * mix
+    # if the difference is between -0.5 and 0.5, we can just add the difference
     else:
-        # if the distance between the two colors is bigger than
-        # the distance between [the second color and 0] + [the first color and 1] ( [0..color2...color1..1] )
-        if 1-color1[0]+color2[0] < color1[0]-color2[0]:
-            # add 1 to the second color, moving it to the right [0..color1...1...color2..2]
-            color2[0] += 1
-    # apply interpolation, by adding both colors mutiplied with a given percentage
-    # and convert the result back to rgb
-    return mpl.colors.hsv_to_rgb((1-mix)*color1 + mix*color2)
+        new_color = color1[0] + color_diff * mix
+    # if the new color is larger than 1, we need to wrap around
+    if new_color > 1:
+        new_color -= 1
+    # if the new color is smaller than 0, we need to wrap around
+    elif new_color < 0:
+        new_color = 1 + new_color
+    # convert back to rgb and return
+    return mpl.colors.hsv_to_rgb([
+        new_color,
+        color1[1] + saturation_diff * mix,
+        color1[2] + value_diff * mix])
 
 if __name__ == "__main__":
     main()
