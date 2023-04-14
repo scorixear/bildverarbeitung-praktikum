@@ -48,7 +48,7 @@ def main():
     grayscaleimage=np.dot(an_image[...,:3],weights)
 
     # paints the image on the plot, but defines that the np-array is now 2-dimensional (grayscale)
-    show_img(grayscaleimage, get_cmap('gray'))
+    show_img(grayscaleimage, 'gray')
 
     # --------- 2. Color Interpolation ----------
 
@@ -98,14 +98,18 @@ def main():
     # show image
     show_img(img)
 
-def show_img(img, cmap: str | None=None):
+def show_img(img, cmap: str | None = None):
     """Shows an image
     
     Args:
         img (np.ndarray): the image to show
         cmap (str, optional): the colormap to use. Defaults to None.
     """
-    plt.imshow(img, cmap=cmap)
+    plt.axis('off')
+    if cmap == None:
+        plt.imshow(img)
+    else:
+        plt.imshow(img, cmap=cmap)
     plt.show()
 
 def color_interpolate_rgb(color1_name: str, color2_name: str, mix: float):
