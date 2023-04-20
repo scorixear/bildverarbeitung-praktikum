@@ -180,6 +180,7 @@ def plot_fourier(original: list[float],
 
 def function1(x: float) -> float:
     """sin(x)
+    shifted by 1 to the top, to get better output
     
     Args:
         x (float): x value
@@ -187,18 +188,18 @@ def function1(x: float) -> float:
     Returns:
         float: result
     """
-    return np.sin(x)
+    return np.sin(x)+1
 
 def function2(x: float) -> float:
     """sin(x) + (3 * sin(2 * x + 1) - 1)
-
+    shifted by 5 to the top, to get better output
     Args:
         x (float): x value
 
     Returns:
         float: result
     """
-    return np.sin(x) + (3 * np.sin(2 * x + 1) - 1)
+    return np.sin(x) + (3 * np.sin(2 * x + 1) - 1) + 5
 
 def main():
     # ------ 1. Fourier Transformation ------
