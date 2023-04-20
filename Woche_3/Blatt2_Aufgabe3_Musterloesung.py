@@ -17,7 +17,7 @@ def main():
     # ----------- 3. Gaussian Kernel -------------
     image = plt.imread("Woche_3/test2.jpg")
 
-    # Generate Gauss filter for all sizes
+    # generate Gauss filter for all sizes
     gauss_3 = getGauss(3)
     gauss_7 = getGauss(7)
     gauss_15 = getGauss(15)

@@ -18,11 +18,11 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 # (1) sin(x) schwingt mit einer Periode von 2pi,
 # Ihre Amplituden sind 1 und -1, welche bei 1/2pi und 3/2pi liegen
 # Und ihre Nullpunkte sind bei 0 und pi
-# Ihre Frequenz Entspricht dementsprechend 1/2pi (1 / Periode)
+# Ihre Frequenz entspricht 1/2pi (1 / Periode)
 #
 # Um eine vollständige Abtastung zu erhalten, müssen wir die Abtastrate
 # mindestens 2x so hoch wählen, wie die höchste Frequenz ist, die wir abbilden wollen.
-# In diesemfall wäre dies 2 * 1/2pi = 1/pi
+# In diesem Fall wäre dies 2 * 1/2pi = 1/pi
 # Um unsere Abtastrate in einen Sampling-Abstand umzuwandeln,
 # muss die Inverse der Abtastrate genommen werden, hier also 1/(1/pi) = pi
 # Es ist zu raten, hier aber mehr als das Doppelte zu nehmen, im Beispiel hier 64.
@@ -30,7 +30,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator
 # (2) sin(x) + (3*sin(2*x+1)-1) besteht aus zwei Sinus-Funktionen
 # sin(x) hat die Frequzenz 1/2pi
 # sin(2x+1) ist eine Verdopplung [x->2x] der Frequenz von sin(x)
-# und somit die Periode pi, weshalb die frequenz 1/pi ist
+# und somit die Periode pi, weshalb die Frequenz 1/pi ist
 #
 # wir wählen die höchste Frequenz beider Frequenzkomponenten aus, hier also 1/pi
 # und multiplizieren sie mit 2, um eine vollständige Abtastung zu erhalten

@@ -15,9 +15,9 @@ import cv2 as cv
 def main():
     # ----------- 2. Box Kernel -------------
     image = plt.imread('Woche_3/test2.jpg')
-    # A 5x5 Matrix filled with 1 = BoxKernel
+    # a 5x5 Matrix filled with 1 = BoxKernel
     kernel = np.ones((5,5))
-    # Filter the image with the kernel, by scaling the kernel with 1/25
+    # filter the image with the kernel, by scaling the kernel with 1/25
     filtered = cv.filter2D(image, -1, kernel*1/25)
     # and show the images
     show_images(image, filtered)
