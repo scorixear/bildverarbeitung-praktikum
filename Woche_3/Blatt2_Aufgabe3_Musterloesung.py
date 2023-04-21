@@ -8,7 +8,6 @@
 #------------------------------------------------#
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.typing as npt
 import cv2 as cv
 import scipy.special
 
@@ -19,8 +18,11 @@ def main():
 
     # generate Gauss filter for all sizes
     gauss_3 = getGauss(3)
+    print(gauss_3)
     gauss_7 = getGauss(7)
+    print(gauss_7)
     gauss_15 = getGauss(15)
+    print(gauss_15)
 
     # apply all filters to the image
     images = []
@@ -34,7 +36,7 @@ def main():
     # and show the images
     show_images(images)
 
-def getGauss(size: int) -> npt.NDArray[np.float64]:
+def getGauss(size: int):
     """Generates a Gauss Filter of the given size
 
     Args:
@@ -45,7 +47,6 @@ def getGauss(size: int) -> npt.NDArray[np.float64]:
     """
     # generate a 2d array of ones
     gauss = np.ones((size, size))
-    print(gauss)
     # for each cell in the matrix
     for i in range(size):
         for j in range(size):
@@ -55,7 +56,7 @@ def getGauss(size: int) -> npt.NDArray[np.float64]:
             gauss[i,j] = (scipy.special.binom(size, i)*scipy.special.binom(size,j))
     return gauss * (1/(2**(2*size)))
 
-def show_images(images: list[tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]]):
+def show_images(images: list[tuple]):
     """Shows A list of image tuples in a subplot
 
     Args:
@@ -71,7 +72,7 @@ def show_images(images: list[tuple[npt.NDArray[np.float64], npt.NDArray[np.float
         plt.imshow(images[i][1])
     plt.show()
 
-def to_gray(image: cv.Mat) -> cv.Mat:
+def to_gray(image):
     """Converts an image to grayscale
 
     Args:

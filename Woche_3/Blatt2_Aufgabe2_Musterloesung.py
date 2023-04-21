@@ -8,7 +8,6 @@
 #------------------------------------------------#
 import matplotlib.pyplot as plt
 import numpy as np
-import numpy.typing as npt
 import cv2 as cv
 
 
@@ -32,7 +31,7 @@ def main():
         # and show the images
         show_images(image, filtered)
 
-def show_images(image1: npt.NDArray[np.float64], image2: npt.NDArray[np.float64]):
+def show_images(image1, image2):
     plt.subplot(1, 2, 1)
     plt.imshow(image1)
     plt.subplot(1, 2, 2)

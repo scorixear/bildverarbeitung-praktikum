@@ -9,7 +9,6 @@
 
 from typing import Callable
 import numpy as np
-import numpy.typing as npt
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
@@ -78,7 +77,7 @@ def get_x_axis_values(frequence: float, sampling_scale: float = 2, lower_bound: 
         values.append(x)
     return values
 
-def discrete_fourier(values: list[float]) -> npt.NDArray[np.complex64]:
+def discrete_fourier(values: list[float]):
     """Calculate the DFT of a given list of values
 
     Args:
@@ -103,7 +102,7 @@ def discrete_fourier(values: list[float]) -> npt.NDArray[np.complex64]:
         fourier.append(1/N * temp_sum)
     return np.array(fourier)
 
-def inverse_discrete_fourier(fourier: npt.NDArray[np.complex64]) -> npt.NDArray[np.complex64]:
+def inverse_discrete_fourier(fourier):
     """Calculates the inverse of the DFT of a given list of fourier values
 
     Args:
@@ -123,9 +122,9 @@ def inverse_discrete_fourier(fourier: npt.NDArray[np.complex64]) -> npt.NDArray[
     return np.array(values)
 
 def plot_fourier(original: list[float],
-                 fourier: npt.NDArray[np.complex64],
-                 inverse_fourier: npt.NDArray[np.complex64],
-                 numpy_fourier: npt.NDArray[np.complex128],
+                 fourier,
+                 inverse_fourier,
+                 numpy_fourier,
                  x_axis_values: list[float]):
     """Plots 4 graphs in one row
 
@@ -149,13 +148,16 @@ def plot_fourier(original: list[float],
     ax.xaxis.set_major_locator(MultipleLocator(base=np.pi))
 
     # position 1,2
+    # we only need the first half of the fourier values, 
+    # because the second half is just the reflection of the first half
+    # we also take only the real part and absolute value
+    fourier_oneside = np.abs(np.real(fourier))[:len(fourier)//2]
+    # since our function abruptly starts at 0, we ignore any wrong values above
+    # a cutoff (defined as 3 here)
+    fourier_oneside = np.array([0 if x > 3 else x for x in fourier_oneside])
     ax = plt.subplot(1,4,2)
     plt.title("Fourier")
-    ax.plot(x_axis_values, np.real(fourier))
-    ax.xaxis.set_major_formatter(FuncFormatter(
-        lambda val,_: '{:.0g}$\pi$'.format(val/np.pi) if val !=0 else '0'
-    ))
-    ax.xaxis.set_major_locator(MultipleLocator(base=np.pi))
+    ax.plot(fourier_oneside)
     
     # position 1,3
     ax = plt.subplot(1,4,3)
@@ -167,13 +169,12 @@ def plot_fourier(original: list[float],
     ax.xaxis.set_major_locator(MultipleLocator(base=np.pi))
     
     # position 1,4
+    numpy_fourier_oneside = np.abs(np.real(numpy_fourier))[:len(numpy_fourier)//2]
+    # the Cutoff for numpy fft is much higher
+    numpy_fourier_oneside = np.array([0 if x > 1000 else x for x in numpy_fourier_oneside])
     ax = plt.subplot(1,4,4)
     plt.title("Numpy Fourier")
-    ax.plot(x_axis_values, np.real(numpy_fourier))
-    ax.xaxis.set_major_formatter(FuncFormatter(
-        lambda val,_: '{:.0g}$\pi$'.format(val/np.pi) if val !=0 else '0'
-    ))
-    ax.xaxis.set_major_locator(MultipleLocator(base=np.pi))
+    ax.plot(numpy_fourier_oneside)
     
     plt.show()
 
