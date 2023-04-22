@@ -154,7 +154,7 @@ def plot_fourier(original: list[float],
     fourier_oneside = np.abs(np.real(fourier))[:len(fourier)//2]
     # since our function abruptly starts at 0, we ignore any wrong values above
     # a cutoff (defined as 3 here)
-    fourier_oneside = np.array([0 if x > 3 else x for x in fourier_oneside])
+    #fourier_oneside = np.array([0 if x > 3 else x for x in fourier_oneside])
     ax = plt.subplot(1,4,2)
     plt.title("Fourier")
     ax.plot(fourier_oneside)
@@ -171,7 +171,7 @@ def plot_fourier(original: list[float],
     # position 1,4
     numpy_fourier_oneside = np.abs(np.real(numpy_fourier))[:len(numpy_fourier)//2]
     # the Cutoff for numpy fft is much higher
-    numpy_fourier_oneside = np.array([0 if x > 1000 else x for x in numpy_fourier_oneside])
+    #numpy_fourier_oneside = np.array([0 if x > 1000 else x for x in numpy_fourier_oneside])
     ax = plt.subplot(1,4,4)
     plt.title("Numpy Fourier")
     ax.plot(numpy_fourier_oneside)
@@ -189,7 +189,7 @@ def function1(x: float) -> float:
     Returns:
         float: result
     """
-    return np.sin(x)+1
+    return np.sin(x) + 1
 
 def function2(x: float) -> float:
     """sin(x) + (3 * sin(2 * x + 1) - 1)
@@ -200,7 +200,7 @@ def function2(x: float) -> float:
     Returns:
         float: result
     """
-    return np.sin(x) + (3 * np.sin(2 * x + 1) - 1) + 5
+    return np.sin(x) + (3 * np.sin(2 * x + 1) - 1)# + 5
 
 def main():
     # ------ 1. Fourier Transformation ------
@@ -218,6 +218,7 @@ def main():
     fourier_values1 = discrete_fourier(discret_values1)
     numpy_fourier1 = np.fft.fft(np.array(discret_values1))
     inverse_fourier1 = inverse_discrete_fourier(fourier_values1)
+
     fourier_values2 = discrete_fourier(discret_values2)
     numpy_fourier2 = np.fft.fft(np.array(discret_values2))
     inverse_fourier2 = inverse_discrete_fourier(fourier_values2)
