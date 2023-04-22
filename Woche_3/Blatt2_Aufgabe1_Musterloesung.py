@@ -99,8 +99,36 @@ def discrete_fourier(values: list[float]):
             # calculate DFT value and add to sum
             temp_sum += np.exp(-2j * np.pi * n * k / N)*values[n]
         # append the sum to the fourier list
+        # the numpy fft implementation does not scale the sum by 1/N
         fourier.append(1/N * temp_sum)
     return np.array(fourier)
+
+def discrete_fourier_short(values: list[float]):
+    """Calculates the DFT of a given list of values
+    this is a second implementation of DFT, which features more numpy
+    and less loops. It is not recommended to use this function, as it is
+
+    Args:
+        values (list[float]): The values of the function
+    
+    Returns:
+        npt.NDArray[np.complex64]: The DFT of the given values
+    """
+    N = len(values)
+    # generates a list of numbers from 0 to N-1
+    n_numbers = np.arange(N)
+    # reshapes the list to a 2D array with N rows and 1 column
+    k_numbers = n_numbers.reshape((N, 1))
+    # calculates the inner part of the sum
+    # will result in a 2d array with N rows and N columns
+    # in which every cell represents one np.exp calculation
+    sum_values = np.exp(-2j * np.pi * k_numbers * n_numbers / N)
+    # calculates the inner sum by multiplying each row with the corresponding value
+    # will result in a 1d array with N values
+    # the / N scales the sum by 1/N
+    return_values = np.dot(sum_values, values) / N
+    return return_values
+
 
 def inverse_discrete_fourier(fourier):
     """Calculates the inverse of the DFT of a given list of fourier values
@@ -146,17 +174,17 @@ def plot_fourier(original: list[float],
         lambda val,_: '{:.0g}$\pi$'.format(val/np.pi) if val !=0 else '0'
     ))
     ax.xaxis.set_major_locator(MultipleLocator(base=np.pi))
+    
 
     # position 1,2
     # we only need the first half of the fourier values, 
     # because the second half is just the reflection of the first half
-    # we also take only the real part and absolute value
-    fourier_oneside = np.abs(np.real(fourier))[:len(fourier)//2]
-    # since our function abruptly starts at 0, we ignore any wrong values above
-    # a cutoff (defined as 3 here)
-    #fourier_oneside = np.array([0 if x > 3 else x for x in fourier_oneside])
+    # we also take only the absolute value
+    fourier_oneside = abs(fourier)[:len(fourier)//2]
     ax = plt.subplot(1,4,2)
     plt.title("Fourier")
+    # set the function to be neatly centered on the y axis
+    ax.set_ylim(top=max(fourier_oneside)*1.1)
     ax.plot(fourier_oneside)
     
     # position 1,3
@@ -169,11 +197,10 @@ def plot_fourier(original: list[float],
     ax.xaxis.set_major_locator(MultipleLocator(base=np.pi))
     
     # position 1,4
-    numpy_fourier_oneside = np.abs(np.real(numpy_fourier))[:len(numpy_fourier)//2]
-    # the Cutoff for numpy fft is much higher
-    #numpy_fourier_oneside = np.array([0 if x > 1000 else x for x in numpy_fourier_oneside])
+    numpy_fourier_oneside = abs(numpy_fourier)[:len(numpy_fourier)//2]
     ax = plt.subplot(1,4,4)
     plt.title("Numpy Fourier")
+    ax.set_ylim(top=max(numpy_fourier_oneside)*1.1)
     ax.plot(numpy_fourier_oneside)
     
     plt.show()
@@ -181,7 +208,6 @@ def plot_fourier(original: list[float],
 
 def function1(x: float) -> float:
     """sin(x)
-    shifted by 1 to the top, to get better output
     
     Args:
         x (float): x value
@@ -189,24 +215,23 @@ def function1(x: float) -> float:
     Returns:
         float: result
     """
-    return np.sin(x) + 1
+    return np.sin(x)
 
 def function2(x: float) -> float:
     """sin(x) + (3 * sin(2 * x + 1) - 1)
-    shifted by 5 to the top, to get better output
     Args:
         x (float): x value
 
     Returns:
         float: result
     """
-    return np.sin(x) + (3 * np.sin(2 * x + 1) - 1)# + 5
+    return np.sin(x) + (3 * np.sin(2 * x + 1) - 1)
 
 def main():
     # ------ 1. Fourier Transformation ------
     # define frequency and sampling scale for both functions
     frequency1 = 1 / (2 * np.pi)
-    sampling_scale1: float = 64
+    sampling_scale1: float = 16
     frequency2 = 1 / np.pi
     sampling_scale2: float = 64
 
