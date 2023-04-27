@@ -51,10 +51,10 @@ def getGauss(size: int):
     for i in range(size):
         for j in range(size):
             # apply the gauss formula: 1/(2^(2m))(m over i)(m over j)
-            # where m is the size of the matrix
+            # where m is the size of the matrix - 1
             # and i,j are the current cell coordinates
-            gauss[i,j] = (scipy.special.binom(size, i)*scipy.special.binom(size,j))
-    return gauss * (1/(2**(2*size)))
+            gauss[i,j] = (scipy.special.binom(size-1, i)*scipy.special.binom(size-1, j))
+    return gauss * (1/(2**(2*(size-1))))
 
 def show_images(images: list[tuple]):
     """Shows A list of image tuples in a subplot
