@@ -17,11 +17,11 @@ def main():
     image = plt.imread("Woche_3/test2.jpg")
 
     # generate Gauss filter for all sizes
-    gauss_3 = getGauss(3)
+    gauss_3 = getGauss(3, 1)
     print(gauss_3)
-    gauss_7 = getGauss(7)
+    gauss_7 = getGauss(7, 2)
     print(gauss_7)
-    gauss_15 = getGauss(15)
+    gauss_15 = getGauss(15, 3)
     print(gauss_15)
 
     # apply all filters to the image
@@ -36,8 +36,9 @@ def main():
     # and show the images
     show_images(images)
 
-def getGauss(size: int):
-    """Generates a Gauss Filter of the given size
+def getBionmial(size: int):
+    """Generates a Binomial Filter of the given size
+    this approximates a gaussian filter
 
     Args:
         size (int): The Size of that filter
@@ -50,11 +51,28 @@ def getGauss(size: int):
     # for each cell in the matrix
     for i in range(size):
         for j in range(size):
-            # apply the gauss formula: 1/(2^(2m))(m over i)(m over j)
+            # apply the binomial formula: 1/(2^(2m))(m over i)(m over j)
             # where m is the size of the matrix - 1
             # and i,j are the current cell coordinates
             gauss[i,j] = (scipy.special.binom(size-1, i)*scipy.special.binom(size-1, j))
     return gauss * (1/(2**(2*(size-1))))
+
+def getGauss(size: int, sigma: float):
+    """Generates a Gaussian Filter of the given size
+
+    Args:
+        size (int): The Size of that filter
+        sigma (float): The sigma value of the gaussian
+    
+    Returns:
+        npt.NDArray[np.float64]: The generated filter
+    """
+    gauss = np.ones((size, size))
+    half = size//2
+    for i in range(-half, half+1, 1):
+        for j in range(-half, half+1, 1):
+            gauss[i+half,j+half] = (1/(2*np.pi*(sigma**2)))*np.exp(-1*((i**2+j**2)/(2*sigma**2)))
+    return gauss / np.sum(gauss)
 
 def show_images(images: list[tuple]):
     """Shows A list of image tuples in a subplot
