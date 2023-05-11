@@ -1,7 +1,8 @@
 import matplotlib.pyplot as plt
 import cv2 as cv
 import numpy as np
-import scipy
+import scipy.signal as sig
+import scipy.special as spec
 
 def main():
     img = plt.imread("Woche_6/skeleton.png")
@@ -32,7 +33,7 @@ def show_images(img):
     plt.title('Original')
     
     plt.subplot(232)
-    plt.imshow(laplace(img), cmap="gray")
+    plt.imshow(apply_kernel(img, laplace()), cmap="gray")
     plt.title('Laplace')
     
     plt.subplot(233)
@@ -40,11 +41,11 @@ def show_images(img):
     plt.title('Sobel')
     
     plt.subplot(234)
-    plt.imshow(loG(img), cmap="gray")
+    plt.imshow(apply_kernel(img, loG()), cmap="gray")
     plt.title('LoG')
     
     plt.subplot(235)
-    plt.imshow(doG(img), cmap="gray")
+    plt.imshow(apply_kernel(img, doG()), cmap="gray")
     plt.title('DoG')
     
     plt.show()
@@ -52,47 +53,43 @@ def show_images(img):
 def apply_kernel(img, kernel):
     return cv.filter2D(img, -1, kernel)
 
-<<<<<<< Updated upstream
-def laplace(img):
-    d2x = np.array([1,-2,1])
+def laplace():
+    d2x = np.array([[1,-2,1]])
     d2y = np.reshape(d2x, (3,1))
 
     d2x_pad = np.pad(d2x, ((1,1),(0,0)))
+    d2y_pad = np.pad(d2y, ((0,0),(1,1)))
+    return d2x_pad+d2y_pad
 
-    #kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
-    return kernel
-
-||||||| Stash base
-=======
-def laplace(img):
-    d2x = np.array([1,-2,1])
-    d2y = np.reshape(d2x, (3,1))
-
-    d2x_pad = np.pad(d2x, ((1,1),(0,0)))
-    d2y_pad = np.pad(d2y, )
-
-    #kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
-    return kernel
-
->>>>>>> Stashed changes
 def sobel(img):
     gx = (1/8)*np.array([[1,0,-1],[2,0,-2],[1,0,-1]])
     gy = (1/8)*np.array([[1,2,1],[0,0,0],[-1,-2,-1]])
     imggx = cv.filter2D(img, -1, gx)
     imggy = cv.filter2D(img, -1, gy)
-    return np.sqrt(np.square(imggx) + np.square(imggy))
-
-def loG(img):
-    laplacian = np.array([[0,1,0],[1,-4,1],[0,1,0]])
-    gaussian = np.array([[1,2,1],[2,4,2],[1,2,1]])/16
-    kernel = scipy.signal.convolve2d(laplacian, gaussian, mode='full')
-    print(kernel)
-    #kernel = (1/16)*np.array([[0,1,2,1,0],[1,0,-2,0,1],[2,-2,-8,-2,2],[1,0,-2,0,1],[0,1,2,1,0]])
-    return cv.filter2D(img, -1, kernel)
     
-def doG(img):
-    kernel = np.array([[1,4,6,4,1],[4,0,-8,0,4],[6,-8,-28,-8,6],[4,0,-8,0,4],[1,4,6,4,1]])
-    return cv.filter2D(img, -1, kernel)
+    return np.clip(np.sqrt(np.square(imggx) + np.square(imggy)),0,255)
+
+def bionmial(size: int):
+    # generate a 2d array of ones
+    gauss = np.ones((size, size))
+    # for each cell in the matrix
+    for i in range(size):
+        for j in range(size):
+            # apply the binomial formula: 1/(2^(2m))(m over i)(m over j)
+            # where m is the size of the matrix - 1
+            # and i,j are the current cell coordinates
+            gauss[i,j] = (spec.binom(size-1, i)*spec.binom(size-1, j))
+    return gauss * (1/(2**(2*(size-1))))
+
+def loG():
+    laplacian = laplace()
+    gaussian = bionmial(3)
+    return sig.convolve2d(laplacian, gaussian, mode='full')
+    
+def doG():
+    gaussian = bionmial(3)
+    identity = np.array([[0,0,0],[0,1,0],[0,0,0]])
+    return 4*sig.convolve2d((gaussian-identity),gaussian, mode='full')
 
 if __name__ == "__main__":
     main()
