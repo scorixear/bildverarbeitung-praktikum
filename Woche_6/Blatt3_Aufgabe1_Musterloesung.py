@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import cv2 as cv
 import numpy as np
+import scipy
 
 def main():
     img = plt.imread("Woche_6/skeleton.png")
@@ -48,9 +49,17 @@ def show_images(img):
     
     plt.show()
 
-def laplace(img):
-    kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
+def apply_kernel(img, kernel):
     return cv.filter2D(img, -1, kernel)
+
+def laplace(img):
+    d2x = np.array([1,-2,1])
+    d2y = np.reshape(d2x, (3,1))
+
+    d2x_pad = np.pad(d2x, ((1,1),(0,0)))
+
+    #kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
+    return kernel
 
 def sobel(img):
     gx = (1/8)*np.array([[1,0,-1],[2,0,-2],[1,0,-1]])
@@ -60,7 +69,11 @@ def sobel(img):
     return np.sqrt(np.square(imggx) + np.square(imggy))
 
 def loG(img):
-    kernel = (1/16)*np.array([[0,1,2,1,0],[1,0,-2,0,1],[2,-2,-8,-2,2],[1,0,-2,0,1],[0,1,2,1,0]])
+    laplacian = np.array([[0,1,0],[1,-4,1],[0,1,0]])
+    gaussian = np.array([[1,2,1],[2,4,2],[1,2,1]])/16
+    kernel = scipy.signal.convolve2d(laplacian, gaussian, mode='full')
+    print(kernel)
+    #kernel = (1/16)*np.array([[0,1,2,1,0],[1,0,-2,0,1],[2,-2,-8,-2,2],[1,0,-2,0,1],[0,1,2,1,0]])
     return cv.filter2D(img, -1, kernel)
     
 def doG(img):
