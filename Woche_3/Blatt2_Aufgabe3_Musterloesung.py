@@ -17,11 +17,11 @@ def main():
     image = plt.imread("Woche_3/test2.jpg")
 
     # generate Gauss filter for all sizes
-    gauss_3 = getGauss(3, 1)
+    gauss_3 = get_gauss(3, 1)
     print(gauss_3)
-    gauss_7 = getGauss(7, 2)
+    gauss_7 = get_gauss(7, 2)
     print(gauss_7)
-    gauss_15 = getGauss(15, 3)
+    gauss_15 = get_gauss(15, 3)
     print(gauss_15)
 
     # apply all filters to the image
@@ -36,7 +36,7 @@ def main():
     # and show the images
     show_images(images)
 
-def getBionmial(size: int):
+def get_binomial(size: int):
     """Generates a Binomial Filter of the given size
     this approximates a gaussian filter
 
@@ -57,7 +57,7 @@ def getBionmial(size: int):
             gauss[i,j] = (scipy.special.binom(size-1, i)*scipy.special.binom(size-1, j))
     return gauss * (1/(2**(2*(size-1))))
 
-def getGauss(size: int, sigma: float):
+def get_gauss(size: int, sigma: float):
     """Generates a Gaussian Filter of the given size
 
     Args:
