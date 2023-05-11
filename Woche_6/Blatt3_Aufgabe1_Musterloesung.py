@@ -52,6 +52,7 @@ def show_images(img):
 def apply_kernel(img, kernel):
     return cv.filter2D(img, -1, kernel)
 
+<<<<<<< Updated upstream
 def laplace(img):
     d2x = np.array([1,-2,1])
     d2y = np.reshape(d2x, (3,1))
@@ -61,6 +62,19 @@ def laplace(img):
     #kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
     return kernel
 
+||||||| Stash base
+=======
+def laplace(img):
+    d2x = np.array([1,-2,1])
+    d2y = np.reshape(d2x, (3,1))
+
+    d2x_pad = np.pad(d2x, ((1,1),(0,0)))
+    d2y_pad = np.pad(d2y, )
+
+    #kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]])
+    return kernel
+
+>>>>>>> Stashed changes
 def sobel(img):
     gx = (1/8)*np.array([[1,0,-1],[2,0,-2],[1,0,-1]])
     gy = (1/8)*np.array([[1,2,1],[0,0,0],[-1,-2,-1]])
