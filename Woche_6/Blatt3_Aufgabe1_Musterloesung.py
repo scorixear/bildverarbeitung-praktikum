@@ -69,7 +69,7 @@ def sobel(img):
     
     return np.clip(np.sqrt(np.square(imggx) + np.square(imggy)),0,255)
 
-def bionmial(size: int):
+def binomial(size: int):
     # generate a 2d array of ones
     gauss = np.ones((size, size))
     # for each cell in the matrix
@@ -83,11 +83,11 @@ def bionmial(size: int):
 
 def loG():
     laplacian = laplace()
-    gaussian = bionmial(3)
+    gaussian = binomial(3)
     return sig.convolve2d(laplacian, gaussian, mode='full')
     
 def doG():
-    gaussian = bionmial(3)
+    gaussian = binomial(3)
     identity = np.array([[0,0,0],[0,1,0],[0,0,0]])
     return 4*sig.convolve2d((gaussian-identity),gaussian, mode='full')
 
