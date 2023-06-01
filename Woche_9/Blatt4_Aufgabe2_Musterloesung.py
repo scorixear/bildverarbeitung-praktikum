@@ -14,7 +14,7 @@ class Extrema:
         self.dog_extremum: float = 0.0
         self.orientation  = 0.0
         self.magnitude = 0.0
-        self.descriptors = []
+        self.descriptor = np.array([])
     def __str__(self):
         return f"({self.x}, {self.y}, {self.scale}, {self.difference})"
 
@@ -168,12 +168,17 @@ def taylor_expansion(extremas: list[Extrema], dog_scales: list[list], drop_off: 
         cx = extrema.x
         cy = extrema.y
         for _ in range(5):
-            
+            if(cs < 1 or cs > len(dog_scales[extrema.octave])-2):
+                break
+            if(cx < 1 or cx > dog_scales[extrema.octave][cs].shape[1]-2):
+                break
+            if(cy < 1 or cy > dog_scales[extrema.octave][cs].shape[0]-2):
+                break
             current = dog_scales[extrema.octave][cs]
             previous = dog_scales[extrema.octave][cs-1]
             next_scale = dog_scales[extrema.octave][cs+1]
             
-            first_derivative = np.array([current[cy, cx+1] - current[cy, cx-1], current[cy+1, cx]- current[cy-1, cx], next_scale[cy, cx] - previous[cy, cx]])
+            first_derivative = np.matrix([[current[cy, cx+1] - current[cy, cx-1], current[cy+1, cx]- current[cy-1, cx], next_scale[cy, cx] - previous[cy, cx]]]).T
             
             dxx = (current[cy, cx+1] + current[cy, cx-1] - 2*current[cy, cx])
             dyy = (current[cy+1, cx]- current[cy-1, cx] - 2*current[cy, cx])
@@ -190,8 +195,8 @@ def taylor_expansion(extremas: list[Extrema], dog_scales: list[list], drop_off: 
             # accept extrema
             if(np.max(np.abs(offset)) <= drop_off):
                 new_x = round(cx+offset[0,0])
-                new_y = round(cy+offset[0,1])
-                new_scale = round(0.8*2**(offset[0,2]+extrema.scale/(MAX_SCALE-2)))
+                new_y = round(cy+offset[1,0])
+                new_scale = round(0.8*2**(offset[2,0]+extrema.scale/(MAX_SCALE-2)))
                 if(new_x < 0 or new_x >= current.shape[1]):
                     break
                 if(new_y < 0 or new_y >= current.shape[0]):
@@ -199,22 +204,22 @@ def taylor_expansion(extremas: list[Extrema], dog_scales: list[list], drop_off: 
                 if(new_scale < 0 or new_scale >= len(dog_scales[extrema.octave])):
                     break
                 new_extrema = Extrema(new_x, new_y, extrema.octave, new_scale, extrema.difference)
-                new_extrema.dog_extremum = current[extrema.y, extrema.x] + 0.5 * (offset.T @ first_derivative)
+                new_extrema.dog_extremum = current[extrema.y, extrema.x] + 0.5 * (offset.T * first_derivative)
                 new_extremas.append(new_extrema)
                 break
             # reject extrema if offset is beyond image border
             if(round(cx+offset[0,0]) < 0 
                or round(cx+offset[0,0]) >= current.shape[1]):
                 break
-            if(round(cy+offset[0,1]) < 0 
-               or round(cy+offset[0,1]) >= round(current.shape[0])):
+            if(round(cy+offset[1,0]) < 0 
+               or round(cy+offset[1,0]) >= round(current.shape[0])):
                 break
-            if(round(cs+offset[0,2]) < 0 
-               or round(cs+offset[0,2]) >= len(dog_scales[extrema.octave])):
+            if(round(cs+offset[2,0]) < 0 
+               or round(cs+offset[2,0]) >= len(dog_scales[extrema.octave])):
                 break
             cx = round(cx + offset[0,0])
-            cy = round(cy + offset[0,1])
-            cs = round(cs + offset[0,2])
+            cy = round(cy + offset[1,0])
+            cs = round(cs + offset[2,0])
     return new_extremas
 
 
@@ -309,53 +314,58 @@ def assign_orientations(extremas: list[Extrema], scale_space: list[list], window
 
 def create_descriptors(extremas: list[Extrema], scale_space: list[list], window_size, sub_window_size, num_bins, gradient_threshold) -> list[Extrema]:
     new_extremas = []
-    gradient = []
+    gradient: list[Tuple[np.ndarray, np.ndarray]] = []
     for o in range(len(scale_space)):
         for s in range(len(scale_space[o])):
             image = scale_space[o][s]
             dx = np.gradient(image, axis=1)
             dy = np.gradient(image, axis=0)
             gradient.append((dx, dy))
+    lambda_descr = window_size
     for extrema in extremas:
-        if(extrema.x-window_size/2-1 < 0 
-           or extrema.x+window_size/2+1 >= scale_space[extrema.octave][extrema.scale].shape[1]
-           or extrema.y-window_size/2-1 < 0
-           or extrema.y+window_size/2+1 >= scale_space[extrema.octave][extrema.scale].shape[0]):
-            continue
-        y = extrema.y
-        x = extrema.x
-        scale = extrema.scale
-        octave = extrema.octave
-        image = scale_space[octave][scale]
-        dx = np.gradient(image, axis=1)
-        dy = np.gradient(image, axis=0)
-        
-        xmin = x-window_size//2
-        xmax = x+window_size//2
-        ymin = y-window_size//2
-        ymax = y+window_size//2
-        
-        local_region = image[ymin:ymax+1, xmin:xmax+1]
-        descriptors = []
-        for iy in range(window_size//sub_window_size):
-            for ix in range(window_size//sub_window_size):
-                region = local_region[
-                    iy*sub_window_size:(iy+1)*sub_window_size, 
-                    ix*sub_window_size:(ix+1)*sub_window_size]
-                dx = np.gradient(region, axis=1)
-                dy = np.gradient(region, axis=0)
-                magnitude = np.sqrt(dx**2 + dy**2)
-                orientation = np.arctan2(dy, dx) * 180 / np.pi
-                histogram = np.zeros(num_bins)
-                hist_width = 360 / num_bins
-                
-                for mag, angle in zip(magnitude.flat, orientation.flat):
-                    bin_index = int(((angle - extrema.orientation) % 360)/hist_width)%num_bins
-                    histogram[bin_index] += mag
-                histogram[histogram > gradient_threshold] = 0
-                descriptors.append(histogram)
-        extrema.descriptors = descriptors
-        new_extremas.append(extrema)
+        limit = np.sqrt(2)*lambda_descr*extrema.scale
+        image = scale_space[extrema.octave][extrema.scale]
+        if(round(limit*(sub_window_size+1)/sub_window_size) <= extrema.x 
+           and extrema.x <= image.shape[1]-round(limit*(sub_window_size+1)/sub_window_size) 
+           and round(limit*(sub_window_size+1)/sub_window_size) <= extrema.y 
+           and extrema.y <= image.shape[0]-round(limit*(sub_window_size+1)/sub_window_size)):
+            histograms = [[np.zeros(num_bins) for _ in range(sub_window_size)] for _ in range(sub_window_size)]
+            for m in range(extrema.x - round(limit*(sub_window_size+1)/sub_window_size), extrema.x + round(limit*(sub_window_size+1)/sub_window_size), round(2*limit/sub_window_size)):
+                for n in range(extrema.y - round(limit*(sub_window_size+1)/sub_window_size), extrema.y + round(limit*(sub_window_size+1)/sub_window_size), round(2*limit/sub_window_size)):
+                    x_d = ((m-extrema.x)*np.cos(extrema.orientation) + (n-extrema.y)*np.sin(extrema.orientation)) / extrema.scale
+                    y_d = (-(m-extrema.x)*np.sin(extrema.orientation) + (n-extrema.y)*np.cos(extrema.orientation)) / extrema.scale
+                    
+                    if(np.max(np.abs([x_d, y_d])) < lambda_descr*(sub_window_size+1)/sub_window_size):
+                        grad = gradient[extrema.octave * len(scale_space) + extrema.scale]
+                        delta_mn = (np.arctan2(grad[0][n,m], grad[1][n,m]) - extrema.orientation ) % (2*np.pi)
+                        c_mn = np.exp(-(x_d**2 + y_d**2)/(2*(lambda_descr/sub_window_size)**2))
+                        for i in range(sub_window_size):
+                            if(np.abs(i-x_d) > (2*lambda_descr/sub_window_size)):
+                                continue
+                            for j in range(sub_window_size):
+                                if(np.abs(j-y_d) > (2*lambda_descr/sub_window_size)):
+                                    continue
+                                for k in range(num_bins):
+                                    if((2*np.pi*(k)/num_bins - delta_mn)%(2*np.pi/num_bins) >= (2*np.pi/num_bins)):
+                                        continue
+                                    temp = (1-(sub_window_size/(2*lambda_descr))*np.abs(x_d-i))
+                                    temp *= (1-(sub_window_size/(2*lambda_descr))*np.abs(y_d-j))
+                                    temp *= (1-(num_bins/(2*np.pi))*np.abs((delta_mn - (2*np.pi*(k)/num_bins))%(2*np.pi)))
+                                    temp *= c_mn
+                                    
+                                    histograms[i][j][k] += temp
+            feature_temp = []
+            for i in range(sub_window_size):
+                for j in range(sub_window_size):
+                    for k in range(num_bins):
+                        feature_temp.append(histograms[i][j][k])
+            feature_vector = np.array(feature_temp)
+            normalized = np.linalg.norm(feature_vector)
+            for i in range(len(feature_vector)):
+                feature_vector[i] = min(feature_vector[i], gradient_threshold*normalized)
+                feature_vector[i] = min(np.floor(512*feature_vector[i]/normalized), 255)
+            extrema.descriptor = feature_vector
+            new_extremas.append(extrema)
     return new_extremas
 
 EXTREMAS = []
@@ -449,19 +459,19 @@ def show_extremas(scale_space,
                    [extrema.y for extrema in EXTREMAS if extrema.octave == 0 and extrema.scale == CURRENT_SCALE + SCALE_OFFSET],
                    [np.sin(extrema.orientation*np.pi/180)*extrema.magnitude for extrema in EXTREMAS if extrema.octave == 0 and extrema.scale == CURRENT_SCALE + SCALE_OFFSET],
                    [np.cos(extrema.orientation*np.pi/180)*extrema.magnitude for extrema in EXTREMAS if extrema.octave == 0 and extrema.scale == CURRENT_SCALE + SCALE_OFFSET])
-    if(SHOW_DESCRIPTORS):
-        for extrema in EXTREMAS:
-            if(extrema.octave == 0 and extrema.scale == CURRENT_SCALE + SCALE_OFFSET):
-                for iy in range(4):
-                    for ix in range(4):
-                        descriptor = extrema.descriptors[iy*4+ix]
-                        mag = 20#np.max(descriptor)
-                        angle = np.argmax(descriptor)*360/8
-                        plt.plot([extrema.x, 
-                                   extrema.x + np.sin(angle*np.pi/180)*mag], 
-                                   [extrema.y, 
-                                   extrema.y + np.cos(angle*np.pi/180)*mag],
-                                   color="y", linestyle="-", linewidth=0.5)
+    # if(SHOW_DESCRIPTORS):
+    #     for extrema in EXTREMAS:
+    #         if(extrema.octave == 0 and extrema.scale == CURRENT_SCALE + SCALE_OFFSET):
+    #             for iy in range(4):
+    #                 for ix in range(4):
+    #                     descriptor = extrema.descriptors[iy*4+ix]
+    #                     mag = 20#np.max(descriptor)
+    #                     angle = np.argmax(descriptor)*360/8
+    #                     plt.plot([extrema.x, 
+    #                                extrema.x + np.sin(angle*np.pi/180)*mag], 
+    #                                [extrema.y, 
+    #                                extrema.y + np.cos(angle*np.pi/180)*mag],
+    #                                color="y", linestyle="-", linewidth=0.5)
     plt.show()
     fig.canvas.mpl_disconnect(cid)
 
