@@ -1,10 +1,10 @@
 import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Callable
 from scipy import signal
 
-class Extrema:
+class Extremum:
     def __init__(self, 
                  m: int,
                  n: int,
@@ -13,10 +13,25 @@ class Extrema:
                  x: int = 0,
                  y: int = 0,
                  sigma: float = 0.0,
-                 w: float = 0.0,
+                 omega: float = 0.0,
                  orientation: float = 0.0,
                  magnitude: float = 0.0,
                  descriptor: np.ndarray = np.array([])):
+        """Represents Extrema / Keypoint
+
+        Args:
+            m (int): The x - coordinate in Dog image
+            n (int): The y - coordinate in Dog image
+            o (int): The octave
+            s (int): The scale level from Dog image
+            x (int, optional): The x - coordinate in scale space. Defaults to 0.
+            y (int, optional): the y - coordinate in scale space. Defaults to 0.
+            sigma (float, optional): The scale level in scale space. Defaults to 0.0.
+            omega (float, optional): The scale value in scale space. Defaults to 0.0.
+            orientation (float, optional): The Orientation delta in radians. Defaults to 0.0.
+            magnitude (float, optional): The magnitude of the orientation. Defaults to 0.0.
+            descriptor (np.ndarray, optional): The descriptor feature vector. Defaults to np.array([]).
+        """
         self.m = m
         self.n = n
         self.o = o
@@ -24,70 +39,75 @@ class Extrema:
         self.x = x
         self.y = y
         self.sigma = sigma
-        self.w: float = w
+        self.omega: float = omega
         self.orientation  = orientation
         self.magnitude = magnitude
         self.descriptor = descriptor
     def __str__(self):
-        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, d: {self.sigma}, x: {self.x}, y: {self.y}, dog: {self.w}, ori: {self.orientation}, mag: {self.magnitude}]"
+        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, d: {self.sigma}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, w: {self.omega}, ori: {self.orientation}, mag: {self.magnitude}]"
 
     def __repr__(self):
-        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, d: {self.sigma}, x: {self.x}, y: {self.y}, dog: {self.w}, ori: {self.orientation}, mag: {self.magnitude}]"
+        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, d: {self.sigma}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, w: {self.omega}, ori: {self.orientation}, mag: {self.magnitude}]"
 
-def create_scale_space(img, octaves, scales):
+def create_scale_space(img: np.ndarray, octaves: int, scales: int, delta_min: float = 0.5, sigma_min: float = 0.8) -> list[list[np.ndarray]]:
     """Creates a scale space for a given image
 
     Args:
         img (np.ndarray): the image
         octaves (int): the number of octaves
         scales (int): the number of scales
+        delta_min (float): the starting delta value. Defaults to 0.5.
+        sigma_min (float): the starting sigma value. Defaults to 0.8.
 
     Returns:
-        np.ndarray: the scale space
+        list[list[np.ndarray]]: the scale space divide into octave - scales - images
     """
     # create the scale space
     scale_space = []
-    delta_min = 0.5
+    # represent current scale factor
     delta_current = delta_min
-    sigma_min = 0.8
-    # scale image to double size
-    resized_img = cv.resize(img, (0,0), fx=2, fy=2, interpolation=cv.INTER_LINEAR)
+    # scale image up with bilinear interpolation
+    resized_img = cv.resize(img, (0,0), fx=1.0 / delta_current, fy=1.0 / delta_current, interpolation=cv.INTER_LINEAR)
     # last_scale_image respresents image at current scale level
-    # calculate first gaussian blur here
-    last_scale_image = cv.GaussianBlur(resized_img, (0,0), sigma_min)
+    last_scale_image = resized_img
     # previous_octave_image represents antepenultimate scale level of previous octave
-    previous_octave_image = last_scale_image
+    previous_octave_image = None
     # for each octave
     for octave in range(octaves):
         octave_images = []
+        # next scaling factor
+        # will be delta_min for octave = 0
+        delta_current = delta_min*2**(octave)
         # for each scale level
         for scale in range(scales):
-            # sigma = 2**(octave + (scale / num_scales))
-            # apply the kernel
-            if(scale != 0 or octave != 0):
-                sigma =(delta_current/delta_min)*sigma_min*2**((scale / (scales-2)))
-                #ksize = (int(2*round(3*sigma)+1), int(2*round(3*sigma)+1))
-                last_scale_image = cv.GaussianBlur(last_scale_image, (0,0), sigma)
+            # calculate sigma
+            # will be sigma_min for octave 0 and scale 0
+            # will be (delta_current/delta_min)*sigma_min for scale = 0
+            sigma =(delta_current/delta_min)*sigma_min*2**((scale / (scales-2)))
+            # (0,0) ksize means calculate kernel size from sigma
+            last_scale_image = cv.GaussianBlur(last_scale_image, (0,0), sigma)
             # add the filtered image to the scale space
-            # if we are at the second last scale level of the octave
             octave_images.append(last_scale_image)
+            # if we are at the second last scale level of the octave
             if(scale == scales - 3):
+                # calculate next scaling factor
+                delta_next = delta_min*2**(octave+1)
+                # sample down and
                 # save image for next octave
-                previous_octave_image = cv.resize(last_scale_image, (0,0), fx=0.5, fy=0.5) # type: ignore
+                previous_octave_image = cv.resize(last_scale_image, (0,0), fx=delta_next / delta_current, fy=delta_next / delta_current) # type: ignore
         last_scale_image = previous_octave_image
         scale_space.append(octave_images)
-        delta_current = delta_min*2**(octave)
     # return the scale space
     return scale_space
 
-def create_dogs(scale_space):
+def create_dogs(scale_space: list[list[np.ndarray]]) -> list[list[np.ndarray]]:
     """Creates the difference of gaussians for a given scale space
 
     Args:
-        scale_space (np.ndarray): the scale space
+        scale_space (list[list[np.ndarray]]): the scale space
 
     Returns:
-        np.ndarray: the difference of gaussians
+        list[list[np.ndarray]]: the difference of gaussians. Will result in scale-1 images per octave
     """
     dogs = []
     # for each octave
@@ -96,12 +116,13 @@ def create_dogs(scale_space):
         # for each scale level (excluding last image)
         for i in range(len(octave)-1):
             # calculate difference of gaussians
+            # possibly use cv.subtract here?
             dog_row.append(np.subtract(octave[i+1], octave[i]))
         # results ins MAX_SCALE - 1 images per octave
         dogs.append(dog_row)
     return dogs
 
-def find_discrete_extremas(dogs: list[list[np.ndarray]]) -> list[Extrema]:
+def find_discrete_extremas(dogs: list[list[np.ndarray]]) -> list[Extremum]:
     """Finds the discrete extremas for a given difference of gaussians
 
     Args:
@@ -112,90 +133,142 @@ def find_discrete_extremas(dogs: list[list[np.ndarray]]) -> list[Extrema]:
     """
     extremas = []
     # for each octave in dogs
-    for (octave_index, dog_octave) in enumerate(dogs):
-        print(f"Octave {octave_index}")
+    for (octave_index, octave_images) in enumerate(dogs):
+        print(f"Extrema Calculation: Octave {octave_index}")
         # for each dog image in the octave excluding first and last image
-        for scale_index in range(1, len(dog_octave)-1):
-            current = dog_octave[scale_index]
-            before = dog_octave[scale_index-1]
-            after = dog_octave[scale_index+1]
+        for scale_index in range(1, len(octave_images)-1):
+            # the current dog image
+            current = octave_images[scale_index]
+            # the one before
+            before = octave_images[scale_index-1]
+            # the one after
+            after = octave_images[scale_index+1]
+            # for each pixel in the image
+            # exluding the border
             for n in range(1, current.shape[0]-1):
                 for m in range(1, current.shape[1]-1):
+                    # neighbours in current dog image
                     neighbours = current[n-1:n+2, m-1:m+2].flatten()
+                    # excluding itself
                     neighbours = np.delete(neighbours, 4)
+                    # neighbours in before dog image
                     neighbours = np.append(neighbours, before[n-1:n+2, m-1:m+2].flatten())
+                    # neighbours in after dog image
                     neighbours = np.append(neighbours, after[n-1:n+2, m-1:m+2].flatten())
+                    # if the current pixel is local minimum or maximum
                     if(np.max(neighbours) < current[n,m] or np.min(neighbours) > current[n,m]):
-                        extremas.append(Extrema(m,n,octave_index,scale_index+1))
-    # results in MAX_SCALE-3 possible extrema images
+                        # create new local extremum
+                        # scale index represent the index of the dog image
+                        # For dog image i, we calculated scale image s_i+1 - s_i
+                        # therefore, we take scale_index+1 here as the correct scale index
+                        extremas.append(Extremum(m,n,octave_index,scale_index+1))
+    # results in MAX_SCALE-3 possible extrema images per octave
+    # since we cannot take 1st and last image of each octave
     return extremas
 
-def taylor_expansion(extremas: list[Extrema], dog_scales: list[list], drop_off: float, contrast_threshold: float) -> list[Extrema]:
+def taylor_expansion(extremas: list[Extremum], dog_scales: list[list[np.ndarray]], drop_off: float, contrast_threshold: float, delta_min: float = 0.5, sigma_min: float = 0.8) -> list[Extremum]:
+    """Finetunes locations of extrema using taylor expansion
+
+    Args:
+        extremas (list[Extremum]): The extremas to finetune
+        dog_scales (list[list[np.ndarray]]): The difference of gaussians images to finetune with
+        drop_off (float): if offset is below, we accept a new location
+        contrast_threshold (float): if dog value is below, we discard the extrema
+        delta_min (float): the starting delta value. Defaults to 0.5.
+        sigma_min (float): the starting sigma value. Defaults to 0.8.
+
+    Returns:
+        list[Extremum]: The new Extremum. Newly created Extremum Objects
+    """
     new_extremas = []
-    for extrema in extremas:
+    for extremum in extremas:
         # discard low contrast candiate keypoints
-        if(np.abs(dog_scales[extrema.o][extrema.s-1][extrema.n, extrema.m]) < 0.8 * contrast_threshold):
+        if(np.abs(dog_scales[extremum.o][extremum.s-1][extremum.n, extremum.m]) < 0.8 * contrast_threshold):
             continue
-        cs = extrema.s
-        cm = extrema.m
-        cn = extrema.n
+        # location of the extremum
+        # will be adjusted maximum 5 times
+        # locations are 0-based
+        # attention when calculating with values
+        cs = extremum.s
+        cm = extremum.m
+        cn = extremum.n
+        # for each adjustment
+        # will break if new location is found
         for _ in range(5):
-            current = dog_scales[extrema.o][cs-1]
-            previous = dog_scales[extrema.o][cs-2]
-            next_scale = dog_scales[extrema.o][cs]
+            # the dog image is always one lower than the scale index
+            current = dog_scales[extremum.o][cs-1]
+            previous = dog_scales[extremum.o][cs-2]
+            next_scale = dog_scales[extremum.o][cs]
+            # called $\bar{g}^o_{s,m,n}$ in the paper
+            # represent the first derivative  in a finite difference scheme
+            # is Transposed, as we calculate [a,b,c] values, but want [[a],[b],[c]]
+            first_derivative = np.matrix([[next_scale[cn, cm] - previous[cn, cm], current[cn, cm+1] - current[cn, cm-1], current[cn+1, cm]- current[cn-1, cm]]]).T
             
-            first_derivative = np.matrix([[current[cn, cm+1] - current[cn, cm-1], current[cn+1, cm]- current[cn-1, cm], next_scale[cn, cm] - previous[cn, cm]]]).T
-            
+            # calcuation of hessian matrix
             dxx = (current[cn, cm+1] + current[cn, cm-1] - 2*current[cn, cm])
             dyy = (current[cn+1, cm]- current[cn-1, cm] - 2*current[cn, cm])
             dss = (next_scale[cn, cm] - previous[cn, cm] - 2*current[cn, cm])
             
+            # dxy, dxs and dys are reused for dyx, dsx and dsy
+            # as they are the same value
             dxy = (current[cn+1, cm+1] - current[cn+1, cm-1]-current[cn-1, cm+1] - current[cn-1, cm-1])/4
             dxs = (next_scale[cn, cm+1] - next_scale[cn, cm-1]- previous[cn, cm+1] - previous[cn, cm-1])/4
             dys = (next_scale[cn+1, cm] - next_scale[cn-1, cm]- previous[cn+1, cm] - previous[cn-1, cm])/4
             
-            hessian = np.matrix([[dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]])
+            # paper annotates 1 = s, 2 = x, 3 = y
+            hessian = np.matrix([[dss, dxs, dxy], [dxs, dxx, dys], [dys, dxy, dyy]])
+            # inverse of a matrix with det = 0 is not possible
+            # therefore we break here
             if(np.linalg.det(hessian) == 0):
                 break
+            # calculate offset
             alpha = -np.linalg.inv(hessian) @ first_derivative
-            # accept extrema
+            # the every value is below the drop_off
+            # we found the new location
             if(np.max(np.abs(alpha)) <= drop_off):
-                w = current[extrema.n, extrema.m] + 0.5*alpha.T*first_derivative
-                delta_min = 0.5
-                delta_current = delta_min*2**(extrema.o)
-                sigma_min = 0.8
-                sigma = delta_current/delta_min*sigma_min*2**((alpha[2,0]+cs)/MAX_SCALE-2)
-                x = delta_current*(alpha[0,0]+cm)
-                y = delta_current*(alpha[1,0]+cn)
-                
-                new_extrema = Extrema(cm, cn, extrema.o, cs, x, y, sigma, w)
+                # this is simplified from 'w+alphaT*g + 0.5*alphaT*H*alpha'
+                # to 'w+0.5*alphaT*g' following the paper
+                # pseudocode does not simplify here
+                # omega represent the value of the DoG interpolated extremum
+                omega = current[extremum.n, extremum.m] + 0.5*alpha.T*first_derivative
+                # calculate the current delta and sigma for the corresponding new location
+                delta_current = delta_min*2**(extremum.o)
+                sigma = delta_current/delta_min*sigma_min*2**((alpha[0,0]+cs)/MAX_SCALE-2)
+                # and the keypoint coordinates
+                x = delta_current*(alpha[1,0]+cm)
+                y = delta_current*(alpha[2,0]+cn)
+                # create new Extremum object with the corresponding values
+                new_extrema = Extremum(cm, cn, extremum.o, cs, x, y, sigma, omega)
                 new_extremas.append(new_extrema)
                 break
-            # reject extrema if offset is beyond image border
+            # reject extrema if offset is beyond image border or scale border
             if(round(cm+alpha[0,0]) < 1
                or round(cm+alpha[0,0]) >= current.shape[1]-1):
                 break
             if(round(cn+alpha[1,0]) < 1
                or round(cn+alpha[1,0]) >= current.shape[0]-1):
                 break
-            if(round(cs+alpha[2,0]) < 1
-               or round(cs+alpha[2,0]) >= len(dog_scales[extrema.o])-1):
+            # since cs represents scale index, we need values from dog index, this is capped at [2, dog_scales]
+            if(round(cs+alpha[2,0]) < 2
+               or round(cs+alpha[2,0]) >= len(dog_scales[extremum.o])):
                 break
-            cm = round(cm + alpha[0,0])
-            cn = round(cn + alpha[1,0])
-            cs = round(cs + alpha[2,0])
+            # if the new location is valid, update the locations in that direction
+            # at least one value will be adjust (as at least one is >0.6)
+            cs = round(cs + alpha[0,0])
+            cm = round(cm + alpha[1,0])
+            cn = round(cn + alpha[2,0])
     return new_extremas
 
-def filter_extremas(extremas: list[Extrema], dogs: list[list], contrast_threshold: float, curvature_threshold: float) -> list[Extrema]:
+def filter_extremas(extremas: list[Extremum], dogs: list[list], contrast_threshold: float, curvature_threshold: float) -> list[Extremum]:
     filtered_extremas = []
     for extrema in extremas:
         cs = extrema.s
-        current = dogs[extrema.o][cs-1]
         cx = extrema.m
         cy = extrema.n
+        current = dogs[extrema.o][cs-1]
         
         # contrast drop off
-        if(abs(extrema.w) < contrast_threshold):
+        if(abs(extrema.omega) < contrast_threshold):
             continue
         # filter off edge extremas
         if(cx < 1 or cx > current.shape[1]-2 or cy < 1 or cy > current.shape[0]-2):
@@ -220,105 +293,106 @@ def filter_extremas(extremas: list[Extrema], dogs: list[list], contrast_threshol
         filtered_extremas.append(extrema)
     return filtered_extremas
 
-def assign_orientations(extremas: list[Extrema], scale_space: list[list], window_size: int, num_bins: int) -> list[Extrema]:
+def scale_space_gradients(scale_space: list[list[np.ndarray]], get_m_limit: Callable[[int, int], int], get_n_limit: Callable[[int, int], int]) -> dict[Tuple[int, int, int, int], Tuple[float, float]]:
+    gradient_2d: dict[Tuple[int, int, int, int], Tuple[float, float]] = {}
+    for o in range(len(scale_space)):
+        for s in range(len(scale_space[o])-2):
+            limit_m = get_m_limit(o, s)
+            limit_n = get_n_limit(o, s)
+            image = scale_space[o][s]
+            for n in range(limit_m):
+                for m in range(limit_n):
+                    gradient_2d[o,s,n,m] = [((image[n,m+1]-image[n,m-1])/2),((image[n+1,m]-image[n-1,m])/2)]
+    return gradient_2d
+
+def assign_orientations(extremas: list[Extremum], scale_space: list[list[np.ndarray]], lambda_ori: float, num_bins: int) -> list[Extremum]:
     # create gaussian kernels for each scale
     new_extremas = []
-    weight = np.exp(-(np.arange(window_size) - window_size // 2)**2 / (2 * 1.5**2))
+    sigma_min = 0.8
+    delta_min = 0.5
+    m_limit: Callable[[int, int], int] = lambda o, s: round(3*lambda_ori*(delta_min*2**(o)/delta_min)*sigma_min*2**(s/(len(scale_space[o]-2))))
+    gradient_2d: dict[Tuple[int, int, int, int], Tuple[float, float]] = scale_space_gradients(scale_space, m_limit, m_limit)
+    
     for extrema in extremas:
+        o = extrema.o
+        x = extrema.x
+        y = extrema.y
+        delta_o = delta_min*2**(extrema.o)
+        limit = 3*lambda_ori*extrema.sigma
+        image = scale_space[extrema.o][round(extrema.sigma)]
         # filter out extremas too close to edge
         # where window size does not fit in image
-        if(extrema.m-window_size-1 < 0 
-           or extrema.m+window_size+1 >= scale_space[extrema.o][extrema.s].shape[1]
-           or extrema.n-window_size-1 < 0
-           or extrema.n+window_size+1 >= scale_space[extrema.o][extrema.s].shape[0]):
+        if(x-limit < 0 or x+limit >= image.shape[1] or y-limit < 0 or y+limit >= image.shape[0]):
             continue
-        
-        x = extrema.m
-        y = extrema.n
-        scale = extrema.s
-        octave = extrema.o
-        image = scale_space[octave][scale]
-        
-        xmin = x-window_size
-        xmax = x+window_size
-        ymin = y-window_size
-        ymax = y+window_size
-        
-        local_region = image[ymin:ymax+1, xmin:xmax+1]
-        
-        dx = np.gradient(local_region, axis=1)
-        dy = np.gradient(local_region, axis=0)
-        magnitude = np.sqrt(dx**2 + dy**2)
-        orientation = np.arctan2(dy, dx)
-        
         histogram = np.zeros(num_bins)
-        hist_width = np.pi*2 / num_bins
+        for m in range(round((x-limit)/delta_o), round((x+limit)/delta_o)):
+            for n in range(round((y-limit)/delta_o), round((y+limit)/delta_o)):
+                dx = gradient_2d[o,round(extrema.sigma),n,m][0]
+                dy = gradient_2d[o,round(extrema.sigma),n,m][1]
+                c_ori = np.exp(-np.linalg.norm(np.array([m*delta_o, n*delta_o])-np.array([x,y]))**2/(2*(lambda_ori*delta_o)**2))*np.linalg.norm([dx,dy])
+                bin_index = round((num_bins/(2*n.pi)*(np.arctan2(dx,dy)))%(2*np.pi))
+                histogram[bin_index] += c_ori
         
-        for mag, angle, w in zip(magnitude.flat, orientation.flat, weight.flat):
-            bin_index = round(angle/hist_width)%num_bins
-            histogram[bin_index] += mag * w
         for _ in range(6):
             histogram = signal.convolve(histogram, np.array([1,1,1])/3)
         max_value = np.max(histogram)*0.8
-        for index, h in enumerate(histogram):
-            prev_hist = histogram[(index-1)%num_bins]
-            next_hist = histogram[(index+1)%num_bins]
-            if(h > prev_hist and h > next_hist and h > max_value):
-                delta_k = 2*np.pi*(index)/num_bins
-                delta_ref = delta_k + np.pi/num_bins*((prev_hist - next_hist)/(prev_hist + next_hist - 2*h))
-                new_extrema = Extrema(extrema.m, extrema.n, extrema.o, extrema.s)
-                new_extrema.w = extrema.w
-                new_extrema.orientation = delta_ref
-                new_extrema.magnitude = h
+        for k, h_k in enumerate(histogram):
+            prev_hist = histogram[(k-1)%num_bins]
+            next_hist = histogram[(k+1)%num_bins]
+            if(h_k > prev_hist and h_k > next_hist and h_k > max_value):
+                Delta_k = 2*np.pi*(k)/num_bins
+                Delta_key = Delta_k+np.pi/num_bins*((prev_hist - next_hist)/(prev_hist + next_hist - 2*h_k))
+                new_extrema = Extremum(extrema.m, extrema.n, extrema.o, extrema.s, x, y, extrema.sigma, extrema.omega, Delta_key, h_k)
                 new_extremas.append(new_extrema)
     return new_extremas
 
-def create_descriptors(extremas: list[Extrema], scale_space: list[list], window_size, sub_window_size, num_bins, gradient_threshold) -> list[Extrema]:
+def create_descriptors(extremas: list[Extremum], scale_space: list[list[np.ndarray]], lambda_descr: float, n_hist: int, n_ori: int, gradient_threshold: float) -> list[Extremum]:
     new_extremas = []
-    gradient: list[Tuple[np.ndarray, np.ndarray]] = []
-    for o in range(len(scale_space)):
-        for s in range(len(scale_space[o])):
-            image = scale_space[o][s]
-            dx = np.gradient(image, axis=1)
-            dy = np.gradient(image, axis=0)
-            gradient.append((dx, dy))
-    lambda_descr = window_size
+    delta_min = 0.5
+    m_limit = lambda o,s: round(np.sqrt(2)*lambda_descr*s)
+    gradient_2d = scale_space_gradients(scale_space, m_limit, m_limit)
     for extrema in extremas:
-        limit = np.sqrt(2)*lambda_descr*extrema.s
+        limit = np.sqrt(2)*lambda_descr*extrema.sigma
         image = scale_space[extrema.o][extrema.s]
-        if(round(limit*(sub_window_size+1)/sub_window_size) <= extrema.m 
-           and extrema.m <= image.shape[1]-round(limit*(sub_window_size+1)/sub_window_size) 
-           and round(limit*(sub_window_size+1)/sub_window_size) <= extrema.n 
-           and extrema.n <= image.shape[0]-round(limit*(sub_window_size+1)/sub_window_size)):
-            histograms = [[np.zeros(num_bins) for _ in range(sub_window_size)] for _ in range(sub_window_size)]
-            for m in range(extrema.m - round(limit*(sub_window_size+1)/sub_window_size), extrema.m + round(limit*(sub_window_size+1)/sub_window_size), round(2*limit/sub_window_size)):
-                for n in range(extrema.n - round(limit*(sub_window_size+1)/sub_window_size), extrema.n + round(limit*(sub_window_size+1)/sub_window_size), round(2*limit/sub_window_size)):
-                    x_d = ((m-extrema.m)*np.cos(extrema.orientation) + (n-extrema.n)*np.sin(extrema.orientation)) / extrema.s
-                    y_d = (-(m-extrema.m)*np.sin(extrema.orientation) + (n-extrema.n)*np.cos(extrema.orientation)) / extrema.s
+        delta_o = delta_min*2**(extrema.o)
+        x = extrema.x
+        y = extrema.y
+        if(limit <= x and x <= image.shape[1]-limit and limit <= y and y <= image.shape[0]-limit):
+            histograms = [[np.zeros(n_ori) for _ in range(n_hist)] for _ in range(n_hist)]
+            
+            for m in range(round((x-limit*(n_hist+1)/n_hist)/delta_o), round((x+limit*(n_hist+1)/n_hist)/delta_o)):
+                for n in range(round((y-limit*(n_hist+1)/n_hist)/delta_o), round((y+limit*(n_hist+1)/n_hist)/delta_o)):
+                    x_mn = ((m*delta_o - x)*np.cos(extrema.orientation) + (n*delta_o-y)*np.sin(extrema.orientation))/extrema.sigma
+                    y_mn = (-(m*delta_o - x)*np.sin(extrema.orientation) + (n*delta_o-y)*np.cos(extrema.orientation))/extrema.sigma
                     
-                    if(np.max(np.abs([x_d, y_d])) < lambda_descr*(sub_window_size+1)/sub_window_size):
-                        grad = gradient[extrema.o * len(scale_space) + extrema.s]
-                        delta_mn = (np.arctan2(grad[0][n,m], grad[1][n,m]) - extrema.orientation ) % (2*np.pi)
-                        c_mn = np.exp(-(x_d**2 + y_d**2)/(2*(lambda_descr/sub_window_size)**2))
-                        for i in range(sub_window_size):
-                            if(np.abs(i-x_d) > (2*lambda_descr/sub_window_size)):
+                    if(max(abs(x_mn), abs(y_mn)) < lambda_descr*(n_hist+1)/n_hist):
+                        dx = gradient_2d[extrema.o,round(extrema.sigma),n,m][0]
+                        dy = gradient_2d[extrema.o,round(extrema.sigma),n,m][1]
+                        Delta_mn =  (np.arctan2(dx, dy) - extrema.orientation)%(2*np.pi)
+                        
+                        c_descr = np.exp(-(np.linalg.norm(np.array([m*delta_o, n*delta_o]) - np.array([x,y]))**2)/(2*(lambda_descr*extrema.sigma)**2))*np.linalg.norm([dx,dy])
+                        for i in range(n_hist):
+                            x_i = ((i+1)-(1+n_hist)/2)*(2*lambda_descr/n_hist)
+                            if(abs(x_i-x_mn) > (2*lambda_descr/n_hist)):
                                 continue
-                            for j in range(sub_window_size):
-                                if(np.abs(j-y_d) > (2*lambda_descr/sub_window_size)):
+                            for j in range(n_hist):
+                                y_j = ((j+1)-(1+n_hist)/2)*(2*lambda_descr/n_hist)
+                                if(np.abs(y_j-y_mn) > (2*lambda_descr/n_hist)):
                                     continue
-                                for k in range(num_bins):
-                                    if((2*np.pi*(k)/num_bins - delta_mn)%(2*np.pi/num_bins) >= (2*np.pi/num_bins)):
+                                for k in range(n_ori):
+                                    Delta_k = 2*np.pi*(k)/n_ori
+                                    if((Delta_k-Delta_mn)%(2*np.pi) >= (2*np.pi/n_ori)):
                                         continue
-                                    temp = (1-(sub_window_size/(2*lambda_descr))*np.abs(x_d-i))
-                                    temp *= (1-(sub_window_size/(2*lambda_descr))*np.abs(y_d-j))
-                                    temp *= (1-(num_bins/(2*np.pi))*np.abs((delta_mn - (2*np.pi*(k)/num_bins))%(2*np.pi)))
-                                    temp *= c_mn
+                                    temp = (1-(n_hist/(2*lambda_descr))*abs(x_mn-x_i))
+                                    temp *= (1-(n_hist/(2*lambda_descr))*abs(y_mn-y_j))
+                                    temp *= (1-(n_ori/(2*np.pi))*np.abs((Delta_mn - Delta_k)%(2*np.pi)))
+                                    temp *= c_descr
                                     
                                     histograms[i][j][k] += temp
             feature_temp = []
-            for i in range(sub_window_size):
-                for j in range(sub_window_size):
-                    for k in range(num_bins):
+            for i in range(n_hist):
+                for j in range(n_hist):
+                    for k in range(n_ori):
                         feature_temp.append(histograms[i][j][k])
             feature_vector = np.array(feature_temp)
             normalized = np.linalg.norm(feature_vector)
@@ -378,7 +452,7 @@ def onclick(event):
     event.canvas.draw()
 
 def show_extremas(scale_space, 
-                  extremas: list[Extrema], 
+                  extremas: list[Extremum], 
                   title: str, 
                   scale_offset: int = 1, 
                   scale_begin = 1, 
@@ -477,7 +551,7 @@ def detect_and_compute(img: np.ndarray,
                        descriptor_sub_window_size: int = 4,
                        descriptor_bins: int = 8,
                        descriptor_gradient_threshold: float = 0.2,
-                       show_plots: bool = False) -> Tuple[list[list[np.ndarray]], list[list[np.ndarray]], list[Extrema]]:
+                       show_plots: bool = False) -> Tuple[list[list[np.ndarray]], list[list[np.ndarray]], list[Extremum]]:
     """detects and computes keypoints and descriptors for a given image
 
     Args:
