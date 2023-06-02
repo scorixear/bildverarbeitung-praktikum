@@ -110,16 +110,6 @@ def create_scale_space(img: np.ndarray, octaves: int, scales: int, delta_min: fl
         delta_prev = delta_o
     return scale_space, deltas, sigmas
 
-def get_scale_index_from_sigma(octave_index: int, sigma: float, sigmas: list[list[float]]) -> int:
-    octave_sigmas = sigmas[octave_index]
-    min_diff = float("inf")
-    min_index = -1
-    for i in range(len(octave_sigmas)):
-        if abs(octave_sigmas[i] - sigma) < min_diff:
-            min_diff = abs(octave_sigmas[i] - sigma)
-            min_index = i
-    return min_index
-
 def create_dogs(scale_space: list[list[np.ndarray]]) -> list[list[np.ndarray]]:
     """Creates the difference of gaussians for a given scale space
 
@@ -343,8 +333,7 @@ def assign_orientations(extremas: list[Extremum],
                         scale_space: list[list[np.ndarray]], 
                         lambda_ori: float, 
                         n_bins: int, 
-                        deltas: list[float],
-                        sigmas: list[list[float]]) -> list[Extremum]:
+                        deltas: list[float]) -> list[Extremum]:
     """Assign orientation angle and magnitude to each Keypoint.
 
     Args:
@@ -373,8 +362,7 @@ def assign_orientations(extremas: list[Extremum],
         # currrent window size
         limit = 3*lambda_ori*extremum.sigma
         # current image in scale space
-        sigma_index = get_scale_index_from_sigma(o_index, extremum.sigma, sigmas)
-        image = scale_space[o_index][sigma_index]
+        image = scale_space[o_index][extremum.s]
         # filter out extremas too close to edge
         # where window size does not fit in image
         lower_x_limit = round((x+1-limit)/delta_o)
@@ -389,7 +377,7 @@ def assign_orientations(extremas: list[Extremum],
         for m in range(lower_x_limit, upper_x_limit+1):
             for n in range(lower_y_limit, upper_y_limit+1):
                 # get current gradient
-                gradient = get_scale_space_gradient_2d(scale_space, o, sigma_index,n-1,m-1)
+                gradient = get_scale_space_gradient_2d(scale_space, o, extremum.s,n-1,m-1)
                 dx = gradient[0]
                 dy = gradient[1]
                 # calculate added gaussian weight
@@ -610,12 +598,15 @@ def show_extremas(scale_space,
                     if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET], 
                 [extremum.n for extremum in EXTREMAS 
                     if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET], c="r", s=1)
+    # draw orientations
     if(SHOW_ORIENTATIONS):
         plt.quiver([extremum.m for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
                    [extremum.n for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
                    [np.sin(extremum.orientation*np.pi/180)*extremum.magnitude for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
                    [np.cos(extremum.orientation*np.pi/180)*extremum.magnitude for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET])
+    ## print descriptors
     if(SHOW_DESCRIPTORS):
+        print(f"Octave: {CURRENT_OCTAVE}, extremum: {CURRENT_SCALE + SCALE_OFFSET}")
         print(np.matrix([extremum.descriptor for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET]))
     plt.show()
     fig.canvas.mpl_disconnect(cid)
@@ -650,9 +641,8 @@ def show_extrema_onclick(event):
                                             [np.cos(extrema.orientation*np.pi/180)*extrema.magnitude for extrema in EXTREMAS
                                              if extrema.o-1 == CURRENT_OCTAVE and extrema.s == CURRENT_SCALE + SCALE_OFFSET])
     if(SHOW_DESCRIPTORS):
-        for extremum in EXTREMAS:
-            if(extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET):
-                print(len(extremum.descriptor))
+        print(f"Octave: {CURRENT_OCTAVE}, extremum: {CURRENT_SCALE + SCALE_OFFSET}")
+        print(np.matrix([extremum.descriptor for extremum in EXTREMAS if extremum.o-1 == CURRENT_OCTAVE and extremum.s == CURRENT_SCALE + SCALE_OFFSET]))
     event.canvas.draw()
     
 def detect_and_compute(img: np.ndarray, 
@@ -710,8 +700,7 @@ def detect_and_compute(img: np.ndarray,
                                      scale_space,
                                      lambda_ori,
                                      n_bins,
-                                     deltas,
-                                     sigmas)
+                                     deltas)
     # show_extremas(scale_space, key_points, "Key Points", 0, 2, MAX_SCALE-1, True)
     descriptor_key_points = create_descriptors(key_points,
                                                scale_space,
