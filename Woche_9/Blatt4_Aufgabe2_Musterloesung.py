@@ -72,6 +72,9 @@ def create_scale_space(img: np.ndarray, octaves: int, scales: int, delta_min: fl
     last_scale_image = resized_img
     # previous_octave_image represents antepenultimate scale level of previous octave
     previous_octave_image = None
+    first_octave_imags = [cv.GaussianBlur(resized_img, )]
+    for scale in range(scales):
+        first_octave_image = 
     # for each octave
     for octave in range(octaves):
         octave_images = []
@@ -232,14 +235,18 @@ def taylor_expansion(extremas: list[Extremum], dog_scales: list[list[np.ndarray]
                 # omega represent the value of the DoG interpolated extremum
                 omega = current[extremum.n, extremum.m] + 0.5*alpha.T*first_derivative
                 # calculate the current delta and sigma for the corresponding new location
-                delta_current = delta_min*2**(extremum.o)
-                sigma = delta_current/delta_min*sigma_min*2**((alpha[0,0]+cs)/MAX_SCALE-2)
+                delta_current = delta_min*2**(extremum.o-1)
+                # sigma is calculated from the scale index
+                # scale index is 0-based, therefore we add 1
+                # sigma is index of scale, therefore we subtract 1
+                sigma = delta_current/delta_min*sigma_min*2**((alpha[0,0]+cs+1)/MAX_SCALE-2)-1
                 # and the keypoint coordinates
-                x = delta_current*(alpha[1,0]+cm)
-                y = delta_current*(alpha[2,0]+cn)
+                # coordinates are 0-based, therefore we subtract 1
+                x = delta_current*(alpha[1,0]+cm+1)-1
+                y = delta_current*(alpha[2,0]+cn+1)-1
                 # create new Extremum object with the corresponding values
-                new_extrema = Extremum(cm, cn, extremum.o, cs, x, y, sigma, omega)
-                new_extremas.append(new_extrema)
+                new_extremum = Extremum(cm, cn, extremum.o, cs, x, y, sigma, omega)
+                new_extremas.append(new_extremum)
                 break
             # reject extrema if offset is beyond image border or scale border
             if(round(cm+alpha[0,0]) < 1
@@ -259,29 +266,45 @@ def taylor_expansion(extremas: list[Extremum], dog_scales: list[list[np.ndarray]
             cn = round(cn + alpha[2,0])
     return new_extremas
 
-def filter_extremas(extremas: list[Extremum], dogs: list[list], contrast_threshold: float, curvature_threshold: float) -> list[Extremum]:
+def filter_extremas(extremas: list[Extremum], dogs: list[list[np.ndarray]], contrast_threshold: float, curvature_threshold: float) -> list[Extremum]:
+    """Filters Extrema based on contrast and curvature
+
+    Args:
+        extremas (list[Extremum]): The extrema to filter
+        dogs (list[list[np.ndarray]]): The dog values to calculate curvature from
+        contrast_threshold (float): Contrast Threshold for the interpolated dog value
+        curvature_threshold (float): Curvature Threshold for the curvature ratio
+
+    Returns:
+        list[Extremum]: Filtered Extremum. Returns same objects from input.
+    """
     filtered_extremas = []
-    for extrema in extremas:
-        cs = extrema.s
-        cx = extrema.m
-        cy = extrema.n
-        current = dogs[extrema.o][cs-1]
+    for extremum in extremas:
+        # current location of the extremum
+        cs = extremum.s
+        cx = extremum.m
+        cy = extremum.n
+        # current dog image
+        current = dogs[extremum.o][cs-1]
         
-        # contrast drop off
-        if(abs(extrema.omega) < contrast_threshold):
+        # contrast drop off from the calculate omega value of taylor expansion
+        if(abs(extremum.omega) < contrast_threshold):
             continue
-        # filter off edge extremas
+        # filter off extremas at the border
         if(cx < 1 or cx > current.shape[1]-2 or cy < 1 or cy > current.shape[0]-2):
             continue
         
+        # 2d-Hessian matrix
         dxx = (current[cy, cx+1] - current[cy, cx-1]) / 2
         dyy = (current[cy+1, cx]- current[cy-1, cx]) / 2
-        
+        # dxy will be resued for dyx
         dxy = (current[cy+1, cx+1] - current[cy+1, cx-1]-current[cy-1, cx+1] - current[cy-1, cx-1])/4
+        # paper annotates 1 = x, 2 = y
         H = np.matrix([[dxx, dxy], [dxy, dyy]])
         
         trace = np.trace(H)
         determinant = np.linalg.det(H)
+        # if we divide by 0, extremum is not valid
         if(determinant == 0):
             continue
         curvature_ratio = (trace*trace)/determinant
@@ -290,35 +313,64 @@ def filter_extremas(extremas: list[Extremum], dogs: list[list], contrast_thresho
         if(curvature_ratio >= (curvature_threshold+1)**2/curvature_threshold):
             continue
         
-        filtered_extremas.append(extrema)
+        filtered_extremas.append(extremum)
     return filtered_extremas
 
-def scale_space_gradients(scale_space: list[list[np.ndarray]], get_m_limit: Callable[[int, int], int], get_n_limit: Callable[[int, int], int]) -> dict[Tuple[int, int, int, int], Tuple[float, float]]:
+def scale_space_gradients(scale_space: list[list[np.ndarray]], 
+                          get_limit: Callable[[int, int], int]) -> dict[Tuple[int, int, int, int], Tuple[float, float]]:
+    """Calculate the Scale Space Gradients
+
+    Args:
+        scale_space (list[list[np.ndarray]]): The scale space to calculate from
+        get_limit (Callable[[int, int], int]): The size of the window to calculate the gradient for. Window size is exactly limit. Ranging from 0 to limit-1.
+
+    Returns:
+        dict[Tuple[int, int, int, int], Tuple[float, float]]: Dictionary of gradients. Key is (octave, scale, n, m) and value is (gradient_x, gradient_y)
+    """
     gradient_2d: dict[Tuple[int, int, int, int], Tuple[float, float]] = {}
+    # for each octave
     for o in range(len(scale_space)):
+        # for each scale excluding last 2 scales
         for s in range(len(scale_space[o])-2):
-            limit_m = get_m_limit(o, s)
-            limit_n = get_n_limit(o, s)
+            limit_m = get_limit(o, s)
             image = scale_space[o][s]
             for n in range(limit_m):
-                for m in range(limit_n):
+                for m in range(limit_m):
                     gradient_2d[o,s,n,m] = [((image[n,m+1]-image[n,m-1])/2),((image[n+1,m]-image[n-1,m])/2)]
     return gradient_2d
 
-def assign_orientations(extremas: list[Extremum], scale_space: list[list[np.ndarray]], lambda_ori: float, num_bins: int) -> list[Extremum]:
+def assign_orientations(extremas: list[Extremum], scale_space: list[list[np.ndarray]], lambda_ori: float, num_bins: int, delta_min: float = 0.5, sigma_min: float = 0.8) -> list[Extremum]:
+    """Assign orientation angle and magnitude to each Keypoint.
+
+    Args:
+        extremas (list[Extremum]): List of extrema to assign orientation to
+        scale_space (list[list[np.ndarray]]): The scale space to calculate from
+        lambda_ori (float): window size, calculated by 3*lambda_ori*sigma of the current extremum
+        num_bins (int): number of bins per histogram. 36 is recommended.
+        delta_min (float): the starting delta value. Defaults to 0.5.
+        sigma_min (float): the starting sigma value. Defaults to 0.8.
+
+    Returns:
+        list[Extremum]: List of extrema with assigned orientation. Returns new Extremum objects.
+    """
     # create gaussian kernels for each scale
     new_extremas = []
-    sigma_min = 0.8
-    delta_min = 0.5
+    # limit for the gradient window
     m_limit: Callable[[int, int], int] = lambda o, s: round(3*lambda_ori*(delta_min*2**(o)/delta_min)*sigma_min*2**(s/(len(scale_space[o]-2))))
+    # calculate gradients for each scale
     gradient_2d: dict[Tuple[int, int, int, int], Tuple[float, float]] = scale_space_gradients(scale_space, m_limit, m_limit)
     
     for extrema in extremas:
+        # keypoint coordinates
+        # coordinates are 0 based
         o = extrema.o
         x = extrema.x
         y = extrema.y
+        # current delta
         delta_o = delta_min*2**(extrema.o)
+        # currrent window size
         limit = 3*lambda_ori*extrema.sigma
+        # current image in scale space
         image = scale_space[extrema.o][round(extrema.sigma)]
         # filter out extremas too close to edge
         # where window size does not fit in image
