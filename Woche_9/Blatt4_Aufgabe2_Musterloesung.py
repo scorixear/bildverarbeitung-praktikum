@@ -173,7 +173,12 @@ def find_discrete_extremas(dogs: list[list[np.ndarray]]) -> list[Extremum]:
     # since we cannot take 1st and last image of each octave
     return extremas
 
-def taylor_expansion(extremas: list[Extremum], dog_scales: list[list[np.ndarray]], drop_off: float, contrast_threshold: float, delta_min: float = 0.5, sigma_min: float = 0.8) -> list[Extremum]:
+def taylor_expansion(extremas: list[Extremum],
+                     dog_scales: list[list[np.ndarray]],
+                     drop_off: float,
+                     contrast_threshold: float,
+                     deltas: list[float],
+                     sigmas: list[list[float]]) -> list[Extremum]:
     """Finetunes locations of extrema using taylor expansion
 
     Args:
@@ -241,9 +246,9 @@ def taylor_expansion(extremas: list[Extremum], dog_scales: list[list[np.ndarray]
                 # omega represent the value of the DoG interpolated extremum
                 omega = current[extremum.n, extremum.m] + 0.5*alpha.T*first_derivative
                 # calculate the current delta and sigma for the corresponding new location
-                delta_current = delta_min*2**(extremum.o)
+                delta_current = deltas[o_index]
                 # sigma is calculated from the scale
-                sigma = delta_current/delta_min*sigma_min*2**((alpha[0,0]+cs)/MAX_SCALE-2)
+                sigma = sigmas[o_index][round(cs+alpha[0,0])]
                 # and the keypoint coordinates
                 # coordinates are 0-based, therefore we add 1 to current-location and subtract 1 from total
                 x = delta_current*(alpha[1,0]+cm+1)-1
@@ -319,32 +324,14 @@ def filter_extremas(extremas: list[Extremum], dogs: list[list[np.ndarray]], cont
         filtered_extremas.append(extremum)
     return filtered_extremas
 
-def scale_space_gradients(scale_space: list[list[np.ndarray]], 
-                          get_limit: Callable[[int, int], int]) -> dict[Tuple[int, int, int, int], Tuple[float, float]]:
-    """Calculate the Scale Space Gradients
-
-    Args:
-        scale_space (list[list[np.ndarray]]): The scale space to calculate from
-        get_limit (Callable[[int, int], int]): The size of the window to calculate the gradient for. Window size is exactly limit. Ranging from 0 to limit-1.
-
-    Returns:
-        dict[Tuple[int, int, int, int], Tuple[float, float]]: Dictionary of gradients. Key is (octave, scale, n, m) and value is (gradient_x, gradient_y)
-    """
-    gradient_2d: dict[Tuple[int, int, int, int], Tuple[float, float]] = {}
-    # for each octave
-    for o in range(1,len(scale_space)+1):
-        # for each scale excluding last 2 scales
-        for s in range(1, len(scale_space[o-1])-2):
-            limit_m = get_limit(o, s)
-            image = scale_space[o-1][s]
-            for n in range(1,limit_m-1):
-                for m in range(1,limit_m-1):
-                    gradient_2d[o,s,n,m] = [((image[n,m+1]-image[n,m-1])/2),((image[n+1,m]-image[n-1,m])/2)]
-    return gradient_2d
 def get_scale_space_gradient_2d(scale_space: list[list[np.ndarray]], octave: int, scale: int, n: int, m: int) -> Tuple[float, float]:
     image = scale_space[octave-1][scale]
     return [((image[n,m+1]-image[n,m-1])/2),((image[n+1,m]-image[n-1,m])/2)]
-def assign_orientations(extremas: list[Extremum], scale_space: list[list[np.ndarray]], lambda_ori: float, num_bins: int, delta_min: float = 0.5, sigma_min: float = 0.8) -> list[Extremum]:
+def assign_orientations(extremas: list[Extremum], 
+                        scale_space: list[list[np.ndarray]], 
+                        lambda_ori: float, 
+                        num_bins: int, 
+                        deltas: list[float]) -> list[Extremum]:
     """Assign orientation angle and magnitude to each Keypoint.
 
     Args:
@@ -352,18 +339,13 @@ def assign_orientations(extremas: list[Extremum], scale_space: list[list[np.ndar
         scale_space (list[list[np.ndarray]]): The scale space to calculate from
         lambda_ori (float): window size, calculated by 3*lambda_ori*sigma of the current extremum
         num_bins (int): number of bins per histogram. 36 is recommended.
-        delta_min (float): the starting delta value. Defaults to 0.5.
-        sigma_min (float): the starting sigma value. Defaults to 0.8.
+        deltas (list[float]): list of deltas for each octave
 
     Returns:
         list[Extremum]: List of extrema with assigned orientation. Returns new Extremum objects.
     """
     # create gaussian kernels for each scale
     new_extremas = []
-    # limit for the gradient window
-    # get_limit: Callable[[int, int], int] = lambda o, s: round(6*lambda_ori*(delta_min*2**(o-1)/delta_min)*sigma_min*2**(s/(len(scale_space[o-1])-2)))
-    # calculate gradients for each scale
-    # gradient_2d: dict[Tuple[int, int, int, int], Tuple[float, float]] = scale_space_gradients(scale_space, get_limit)
     
     for extrema in extremas:
         # keypoint coordinates
@@ -374,7 +356,7 @@ def assign_orientations(extremas: list[Extremum], scale_space: list[list[np.ndar
         x = extrema.x
         y = extrema.y
         # current delta
-        delta_o = delta_min*2**(o-1)
+        delta_o = deltas[o_index]
         # currrent window size
         limit = 3*lambda_ori*extrema.sigma
         # current image in scale space
@@ -430,7 +412,7 @@ def create_descriptors(extremas: list[Extremum],
                        n_hist: int,
                        n_ori: int,
                        gradient_threshold: float,
-                       delta_min: float = 0.5) -> list[Extremum]:
+                       deltas: list[float]) -> list[Extremum]:
     """Creates Key Descriptors for each Keypoint.
 
     Args:
@@ -440,6 +422,7 @@ def create_descriptors(extremas: list[Extremum],
         n_hist (int): number of histograms in that window
         n_ori (int): number of bins per histogram
         gradient_threshold (float): caps the feature vector at gradient_threshold*norm(feature_vector)
+        deltas (list[float]): list of deltas for each octave
 
     Returns:
         list[Extremum]: The keypoints with descriptors. Extrema are same objects.
@@ -454,7 +437,7 @@ def create_descriptors(extremas: list[Extremum],
         limit = np.sqrt(2)*lambda_descr*extrema.sigma
         # current image, octave is 1-based
         image = scale_space[extrema.o-1][extrema.s]
-        delta_o = delta_min*2**(extrema.o-1)
+        delta_o = deltas[extrema.o-1]
         x = extrema.x
         y = extrema.y
         lower_x_limit = round((x-limit*(n_hist+1)/n_hist)/delta_o)
@@ -697,20 +680,37 @@ def detect_and_compute(img: np.ndarray,
     Returns:
         Tuple[list[list[np.ndarray]], list[list[np.ndarray]], list[Extrema]]: scale space [octave][scale], dogs [octave, scale-1], extremas
     """
-    scale_space = create_scale_space(img, MAX_OCTAVE, MAX_SCALE)
+    scale_space, deltas, sigmas = create_scale_space(img, MAX_OCTAVE, MAX_SCALE)
     # show_array(scale_space, "Scale Space")
     dogs = create_dogs(scale_space)
     normalized_dogs = [[cv.normalize(d, None, 0, 1, cv.NORM_MINMAX) for d in octave] for octave in dogs] # type: ignore
     # show_array(dogs, "Normalized DoGs")
     discrete_extremas = find_discrete_extremas(dogs)
     # show_extremas(dogs, discrete_extremas, "Discrete Extremas")
-    taylor_extremas = taylor_expansion(discrete_extremas, dogs, taylor_threshold, contrast_threshold)
+    taylor_extremas = taylor_expansion(discrete_extremas, 
+                                       dogs, 
+                                       taylor_threshold, 
+                                       contrast_threshold, 
+                                       deltas, 
+                                       sigmas)
     # show_extremas(dogs, taylor_extremas, "Taylor Extremas")
-    filtered_extremas = filter_extremas(taylor_extremas, dogs, contrast_threshold, curvature_threshold)
+    filtered_extremas = filter_extremas(taylor_extremas,
+                                        dogs, contrast_threshold,
+                                        curvature_threshold)
     # show_extremas(dogs, filtered_extremas, "Filtered Extremas")
-    key_points = assign_orientations(filtered_extremas, scale_space, orientation_window_size, orientation_bins)
+    key_points = assign_orientations(filtered_extremas,
+                                     scale_space,
+                                     orientation_window_size,
+                                     orientation_bins,
+                                     deltas)
     # show_extremas(scale_space, key_points, "Key Points", 0, 2, MAX_SCALE-1, True)
-    descriptor_key_points = create_descriptors(key_points, scale_space, descriptor_window_size, descriptor_sub_window_size, descriptor_bins, descriptor_gradient_threshold)
+    descriptor_key_points = create_descriptors(key_points,
+                                               scale_space,
+                                               descriptor_window_size,
+                                               descriptor_sub_window_size,
+                                               descriptor_bins,
+                                               descriptor_gradient_threshold,
+                                               deltas)
     # show_extremas(scale_space, descriptor_key_points, "Descriptor Key Points", 0, 2, MAX_SCALE-1, True, True)
     
     if(show_plots):
