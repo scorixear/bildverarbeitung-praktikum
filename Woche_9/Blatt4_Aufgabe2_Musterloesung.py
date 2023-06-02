@@ -44,10 +44,10 @@ class Extremum:
         self.magnitude = magnitude
         self.descriptor = descriptor
     def __str__(self):
-        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, d: {self.sigma}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, w: {self.omega}, ori: {self.orientation}, mag: {self.magnitude}]"
+        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, omega: {self.omega}, ori: {self.orientation}, mag: {self.magnitude}]"
 
     def __repr__(self):
-        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, d: {self.sigma}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, w: {self.omega}, ori: {self.orientation}, mag: {self.magnitude}]"
+        return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, omega: {self.omega}, ori: {self.orientation}, mag: {self.magnitude}]"
 
 def create_scale_space(img: np.ndarray, octaves: int, scales: int, delta_min: float = 0.5, sigma_min: float = 0.8) -> Tuple[list[list[np.ndarray]],list[float],list[list[float]]]:
     """Creates a scale space for a given image
@@ -107,7 +107,18 @@ def create_scale_space(img: np.ndarray, octaves: int, scales: int, delta_min: fl
         # current_octave = current_octave[1:]
         # and append octave
         scale_space.append(current_octave)
+        delta_prev = delta_o
     return scale_space, deltas, sigmas
+
+def get_scale_index_from_sigma(octave_index: int, sigma: float, sigmas: list[list[float]]) -> int:
+    octave_sigmas = sigmas[octave_index]
+    min_diff = float("inf")
+    min_index = -1
+    for i in range(len(octave_sigmas)):
+        if abs(octave_sigmas[i] - sigma) < min_diff:
+            min_diff = abs(octave_sigmas[i] - sigma)
+            min_index = i
+    return min_index
 
 def create_dogs(scale_space: list[list[np.ndarray]]) -> list[list[np.ndarray]]:
     """Creates the difference of gaussians for a given scale space
@@ -176,7 +187,7 @@ def find_discrete_extremas(dogs: list[list[np.ndarray]]) -> list[Extremum]:
 def taylor_expansion(extremas: list[Extremum],
                      dog_scales: list[list[np.ndarray]],
                      drop_off: float,
-                     contrast_threshold: float,
+                     c_dog: float,
                      deltas: list[float],
                      sigmas: list[list[float]]) -> list[Extremum]:
     """Finetunes locations of extrema using taylor expansion
@@ -185,7 +196,7 @@ def taylor_expansion(extremas: list[Extremum],
         extremas (list[Extremum]): The extremas to finetune
         dog_scales (list[list[np.ndarray]]): The difference of gaussians images to finetune with
         drop_off (float): if offset is below, we accept a new location
-        contrast_threshold (float): if dog value is below, we discard the extrema
+        c_dog (float): if dog value is below, we discard the extrema
         delta_min (float): the starting delta value. Defaults to 0.5.
         sigma_min (float): the starting sigma value. Defaults to 0.8.
 
@@ -195,7 +206,7 @@ def taylor_expansion(extremas: list[Extremum],
     new_extremas = []
     for extremum in extremas:
         # discard low contrast candiate keypoints
-        if(np.abs(dog_scales[extremum.o-1][extremum.s][extremum.n, extremum.m]) < 0.8 * contrast_threshold):
+        if(np.abs(dog_scales[extremum.o-1][extremum.s][extremum.n, extremum.m]) < 0.8 * c_dog):
             continue
         # location of the extremum
         # will be adjusted maximum 5 times
@@ -248,6 +259,7 @@ def taylor_expansion(extremas: list[Extremum],
                 # calculate the current delta and sigma for the corresponding new location
                 delta_current = deltas[o_index]
                 # sigma is calculated from the scale
+                #sigma = delta_current/deltas[0]*sigma[0][0]*2**((alpha[0,0]+cs)/MAX_SCALE-2)
                 sigma = sigmas[o_index][round(cs+alpha[0,0])]
                 # and the keypoint coordinates
                 # coordinates are 0-based, therefore we add 1 to current-location and subtract 1 from total
@@ -274,14 +286,14 @@ def taylor_expansion(extremas: list[Extremum],
             cn = round(cn + alpha[2,0])
     return new_extremas
 
-def filter_extremas(extremas: list[Extremum], dogs: list[list[np.ndarray]], contrast_threshold: float, curvature_threshold: float) -> list[Extremum]:
+def filter_extremas(extremas: list[Extremum], dogs: list[list[np.ndarray]], c_dog: float, c_edge: float) -> list[Extremum]:
     """Filters Extrema based on contrast and curvature
 
     Args:
         extremas (list[Extremum]): The extrema to filter
         dogs (list[list[np.ndarray]]): The dog values to calculate curvature from
-        contrast_threshold (float): Contrast Threshold for the interpolated dog value
-        curvature_threshold (float): Curvature Threshold for the curvature ratio
+        c_dog (float): Contrast Threshold for the interpolated dog value
+        c_edge (float): Curvature Threshold for the curvature ratio
 
     Returns:
         list[Extremum]: Filtered Extremum. Returns same objects from input.
@@ -296,7 +308,7 @@ def filter_extremas(extremas: list[Extremum], dogs: list[list[np.ndarray]], cont
         current = dogs[extremum.o-1][cs]
         
         # contrast drop off from the calculate omega value of taylor expansion
-        if(abs(extremum.omega) < contrast_threshold):
+        if(abs(extremum.omega) < c_dog):
             continue
         # filter off extremas at the border
         if(cm < 1 or cm > current.shape[1]-2 or cn < 1 or cn > current.shape[0]-2):
@@ -318,7 +330,7 @@ def filter_extremas(extremas: list[Extremum], dogs: list[list[np.ndarray]], cont
         curvature_ratio = (trace*trace)/determinant
         
         # curvature drop off
-        if(curvature_ratio >= (curvature_threshold+1)**2/curvature_threshold):
+        if(curvature_ratio >= (c_edge+1)**2/c_edge):
             continue
         
         filtered_extremas.append(extremum)
@@ -330,8 +342,9 @@ def get_scale_space_gradient_2d(scale_space: list[list[np.ndarray]], octave: int
 def assign_orientations(extremas: list[Extremum], 
                         scale_space: list[list[np.ndarray]], 
                         lambda_ori: float, 
-                        num_bins: int, 
-                        deltas: list[float]) -> list[Extremum]:
+                        n_bins: int, 
+                        deltas: list[float],
+                        sigmas: list[list[float]]) -> list[Extremum]:
     """Assign orientation angle and magnitude to each Keypoint.
 
     Args:
@@ -347,20 +360,21 @@ def assign_orientations(extremas: list[Extremum],
     # create gaussian kernels for each scale
     new_extremas = []
     
-    for extrema in extremas:
+    for extremum in extremas:
         # keypoint coordinates
         # octave is 1-based
-        o = extrema.o
+        o = extremum.o
         # coordinates are 0 based
         o_index = o-1
-        x = extrema.x
-        y = extrema.y
+        x = extremum.x
+        y = extremum.y
         # current delta
         delta_o = deltas[o_index]
         # currrent window size
-        limit = 3*lambda_ori*extrema.sigma
+        limit = 3*lambda_ori*extremum.sigma
         # current image in scale space
-        image = scale_space[o_index][round(extrema.sigma)]
+        sigma_index = get_scale_index_from_sigma(o_index, extremum.sigma, sigmas)
+        image = scale_space[o_index][sigma_index]
         # filter out extremas too close to edge
         # where window size does not fit in image
         lower_x_limit = round((x+1-limit)/delta_o)
@@ -370,18 +384,18 @@ def assign_orientations(extremas: list[Extremum],
         if(lower_x_limit < 0 or upper_x_limit >= image.shape[1] or lower_y_limit < 0 or upper_y_limit >= image.shape[0]):
             continue
         # initialize histogram
-        histogram = np.zeros(num_bins)
+        histogram = np.zeros(n_bins)
         # for each pixel in the window
         for m in range(lower_x_limit, upper_x_limit+1):
             for n in range(lower_y_limit, upper_y_limit+1):
                 # get current gradient
-                gradient = get_scale_space_gradient_2d(scale_space, o, round(extrema.sigma),n-1,m-1)
+                gradient = get_scale_space_gradient_2d(scale_space, o, sigma_index,n-1,m-1)
                 dx = gradient[0]
                 dy = gradient[1]
                 # calculate added gaussian weight
                 c_ori = np.exp(-np.linalg.norm(np.array([m*delta_o, n*delta_o])-np.array([x,y]))**2/(2*(lambda_ori*delta_o)**2))*np.linalg.norm([dx,dy])
                 # calculate bin index from given gradients
-                bin_index = round((num_bins/(2*np.pi))*(np.arctan2(dx,dy)%(2*np.pi)))-1
+                bin_index = round((n_bins/(2*np.pi))*(np.arctan2(dx,dy)%(2*np.pi)))-1
                 # add to histogram
                 histogram[bin_index] += c_ori
         # smooth histogram 6 times by box convolution
@@ -392,17 +406,17 @@ def assign_orientations(extremas: list[Extremum],
         # for each histogram bin
         for k, h_k in enumerate(histogram):
             # get previous and next bin
-            prev_hist = histogram[(k-1)%num_bins]
-            next_hist = histogram[(k+1)%num_bins]
+            prev_hist = histogram[(k-1)%n_bins]
+            next_hist = histogram[(k+1)%n_bins]
             # if current bin is top 80% and local maximum
             if(h_k > prev_hist and h_k > next_hist and h_k > max_value):
                 # delta_k takes k-1 as value, but k is 0-based in loop
                 # therefore k_1_based-1 = k_0_based
-                Delta_k = 2*np.pi*(k)/num_bins
+                Delta_k = 2*np.pi*(k)/n_bins
                 # calculate orientation
-                Delta_key = Delta_k+np.pi/num_bins*((prev_hist - next_hist)/(prev_hist + next_hist - 2*h_k))
+                Delta_key = Delta_k+np.pi/n_bins*((prev_hist - next_hist)/(prev_hist + next_hist - 2*h_k))
                 # create new extremum for each bin passing the above criteria
-                new_extrema = Extremum(extrema.m, extrema.n, extrema.o, extrema.s, x, y, extrema.sigma, extrema.omega, Delta_key, h_k)
+                new_extrema = Extremum(extremum.m, extremum.n, extremum.o, extremum.s, x, y, extremum.sigma, extremum.omega, Delta_key, h_k)
                 new_extremas.append(new_extrema)
     return new_extremas
 
@@ -432,14 +446,15 @@ def create_descriptors(extremas: list[Extremum],
     #get_limit = lambda o,s: round(2*lambda_descr*((n_hist+1)/n_hist)*s)
     # calculate gradients for each scale
     #gradient_2d = scale_space_gradients(scale_space, get_limit)
-    for extrema in extremas:
+    for extremum in extremas:
         # current window size
-        limit = np.sqrt(2)*lambda_descr*extrema.sigma
+        limit = lambda_descr*(n_hist+1)/n_hist*extremum.sigma
         # current image, octave is 1-based
-        image = scale_space[extrema.o-1][extrema.s]
-        delta_o = deltas[extrema.o-1]
-        x = extrema.x
-        y = extrema.y
+        image = scale_space[extremum.o-1][extremum.s]
+        delta_o = deltas[extremum.o-1]
+        
+        x = extremum.x
+        y = extremum.y
         lower_x_limit = round((x-limit*(n_hist+1)/n_hist)/delta_o)
         upper_x_limit = round((x+limit*(n_hist+1)/n_hist)/delta_o)
         lower_y_limit = round((y-limit*(n_hist+1)/n_hist)/delta_o)
@@ -453,19 +468,19 @@ def create_descriptors(extremas: list[Extremum],
         for m in range(lower_x_limit, upper_x_limit+1):
             for n in range(lower_y_limit, upper_y_limit+1):
                 # normalized coordinates
-                x_mn = ((m*delta_o - x)*np.cos(extrema.orientation) + (n*delta_o-y)*np.sin(extrema.orientation))/extrema.sigma
-                y_mn = (-(m*delta_o - x)*np.sin(extrema.orientation) + (n*delta_o-y)*np.cos(extrema.orientation))/extrema.sigma
+                x_mn = ((m*delta_o - x)*np.cos(extremum.orientation) + (n*delta_o-y)*np.sin(extremum.orientation))/extremum.sigma
+                y_mn = (-(m*delta_o - x)*np.sin(extremum.orientation) + (n*delta_o-y)*np.cos(extremum.orientation))/extremum.sigma
                 # verify that point is in normalized window
                 if(max(abs(x_mn), abs(y_mn)) < lambda_descr*(n_hist+1)/n_hist):
                     # get gradients
-                    gradient = get_scale_space_gradient_2d(scale_space, extrema.o, round(extrema.sigma), n-1, m-1)
+                    gradient = get_scale_space_gradient_2d(scale_space, extremum.o, extremum.s, n-1, m-1)
                     dx = gradient[0]
                     dy = gradient[1]
                     # calculate nrormalized gradient orientation
                     # by subtracting the keypoint orientation
-                    Delta_mn =  (np.arctan2(dx, dy) - extrema.orientation)%(2*np.pi)
+                    Delta_mn =  (np.arctan2(dx, dy) - extremum.orientation)%(2*np.pi)
                     # calculate total contribution to histogram
-                    c_descr = np.exp(-(np.linalg.norm(np.array([m*delta_o, n*delta_o]) - np.array([x,y]))**2)/(2*(lambda_descr*extrema.sigma)**2))*np.linalg.norm([dx,dy])
+                    c_descr = np.exp(-(np.linalg.norm(np.array([m*delta_o, n*delta_o]) - np.array([x,y]))**2)/(2*(lambda_descr*extremum.sigma)**2))*np.linalg.norm([dx,dy])
                     # for each histogram
                     for i in range(n_hist):
                         # if corresponding x coordinate is not in histogram
@@ -505,8 +520,8 @@ def create_descriptors(extremas: list[Extremum],
             feature_vector[i] = min(feature_vector[i], gradient_threshold*normalized)
             # and quantizie to 8bit integers
             feature_vector[i] = min(np.floor(512*feature_vector[i]/normalized), 255)
-        extrema.descriptor = feature_vector
-        new_extremas.append(extrema)
+        extremum.descriptor = feature_vector
+        new_extremas.append(extremum)
     return new_extremas
 
 EXTREMAS = []
@@ -591,28 +606,17 @@ def show_extremas(scale_space,
     plt.title(f"Octave {0} Scale {SCALE_BEGIN}")
     plt.imshow(SCALES[0][SCALE_BEGIN], cmap="gray")
     # draw extremas
-    plt.scatter([extrema.m for extrema in EXTREMAS 
-                    if extrema.o-1 == 0 and extrema.s == CURRENT_SCALE + SCALE_OFFSET], 
-                [extrema.n for extrema in EXTREMAS 
-                    if extrema.o-1 == 0 and extrema.s == CURRENT_SCALE + SCALE_OFFSET], c="r", s=1)
+    plt.scatter([extremum.m for extremum in EXTREMAS 
+                    if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET], 
+                [extremum.n for extremum in EXTREMAS 
+                    if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET], c="r", s=1)
     if(SHOW_ORIENTATIONS):
-        plt.quiver([extrema.m for extrema in EXTREMAS if extrema.o-1 == 0 and extrema.s == CURRENT_SCALE + SCALE_OFFSET],
-                   [extrema.n for extrema in EXTREMAS if extrema.o-1 == 0 and extrema.s == CURRENT_SCALE + SCALE_OFFSET],
-                   [np.sin(extrema.orientation*np.pi/180)*extrema.magnitude for extrema in EXTREMAS if extrema.o-1 == 0 and extrema.s == CURRENT_SCALE + SCALE_OFFSET],
-                   [np.cos(extrema.orientation*np.pi/180)*extrema.magnitude for extrema in EXTREMAS if extrema.o-1 == 0 and extrema.s == CURRENT_SCALE + SCALE_OFFSET])
-    # if(SHOW_DESCRIPTORS):
-    #     for extrema in EXTREMAS:
-    #         if(extrema.octave == 0 and extrema.scale == CURRENT_SCALE + SCALE_OFFSET):
-    #             for iy in range(4):
-    #                 for ix in range(4):
-    #                     descriptor = extrema.descriptors[iy*4+ix]
-    #                     mag = 20#np.max(descriptor)
-    #                     angle = np.argmax(descriptor)*360/8
-    #                     plt.plot([extrema.x, 
-    #                                extrema.x + np.sin(angle*np.pi/180)*mag], 
-    #                                [extrema.y, 
-    #                                extrema.y + np.cos(angle*np.pi/180)*mag],
-    #                                color="y", linestyle="-", linewidth=0.5)
+        plt.quiver([extremum.m for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
+                   [extremum.n for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
+                   [np.sin(extremum.orientation*np.pi/180)*extremum.magnitude for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
+                   [np.cos(extremum.orientation*np.pi/180)*extremum.magnitude for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET])
+    if(SHOW_DESCRIPTORS):
+        print(np.matrix([extremum.descriptor for extremum in EXTREMAS if extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET]))
     plt.show()
     fig.canvas.mpl_disconnect(cid)
 
@@ -632,8 +636,8 @@ def show_extrema_onclick(event):
     event.canvas.figure.clear()
     event.canvas.figure.gca().set_title(f"Octave {CURRENT_OCTAVE} Scale {CURRENT_SCALE}")
     event.canvas.figure.gca().imshow(SCALES[CURRENT_OCTAVE][CURRENT_SCALE], cmap="gray")
-    event.canvas.figure.gca().scatter([extrema.m for extrema in EXTREMAS
-                                       if extrema.o-1 == CURRENT_OCTAVE and extrema.s == CURRENT_SCALE + SCALE_OFFSET],
+    event.canvas.figure.gca().scatter([extremum.m for extremum in EXTREMAS
+                                       if extremum.o-1 == CURRENT_OCTAVE and extremum.s == CURRENT_SCALE + SCALE_OFFSET],
                                       [extrema.n for extrema in EXTREMAS
                                        if extrema.o-1 == CURRENT_OCTAVE and extrema.s == CURRENT_SCALE + SCALE_OFFSET], c="r", s=1)
     if(SHOW_ORIENTATIONS):
@@ -645,17 +649,21 @@ def show_extrema_onclick(event):
                                              if extrema.o-1 == CURRENT_OCTAVE and extrema.s == CURRENT_SCALE + SCALE_OFFSET],
                                             [np.cos(extrema.orientation*np.pi/180)*extrema.magnitude for extrema in EXTREMAS
                                              if extrema.o-1 == CURRENT_OCTAVE and extrema.s == CURRENT_SCALE + SCALE_OFFSET])
+    if(SHOW_DESCRIPTORS):
+        for extremum in EXTREMAS:
+            if(extremum.o-1 == 0 and extremum.s == CURRENT_SCALE + SCALE_OFFSET):
+                print(len(extremum.descriptor))
     event.canvas.draw()
     
 def detect_and_compute(img: np.ndarray, 
                        taylor_threshold: float = 0.6,
-                       contrast_threshold: float = 0.015,
-                       curvature_threshold: float = 10.0,
-                       orientation_window_size: int = 10,
-                       orientation_bins: int = 36,
-                       descriptor_window_size: int = 16,
-                       descriptor_sub_window_size: int = 4,
-                       descriptor_bins: int = 8,
+                       c_dog: float = 0.015,
+                       c_edge: float = 10.0,
+                       lambda_ori: float = 1.5,
+                       n_bins: int = 36,
+                       lambda_descr: float = 6,
+                       n_hist: int = 4,
+                       n_ori: int = 8,
                        descriptor_gradient_threshold: float = 0.2,
                        show_plots: bool = False) -> Tuple[list[list[np.ndarray]], list[list[np.ndarray]], list[Extremum]]:
     """detects and computes keypoints and descriptors for a given image
@@ -668,12 +676,12 @@ def detect_and_compute(img: np.ndarray,
         extremum or the local interpolated extremum is above. Defaults to 0.015.
         curvature_threshold (float, optional): extremas are rejected, if the curvature ratio (tr(H)**2/det(H))
         is above. Defaults to 10.0.
-        orientation_window_size (int, optional): window size (one direction) for which the orientation is calculated
-        With 10, this would result in 10 pixels in each direction considered. Defaults to 10.
-        orientation_bins (int, optional): Number of Histogram bins for the orientation calculation. Should divide into 360. Defaults to 36.
-        descriptor_window_size (int, optional): Area around each extrema, for which descriptors are calculated. Defaults to 16.
-        descriptor_sub_window_size (int, optional): window size per descriptor. Should divide into descriptor_window_size. Defaults to 4.
-        descriptor_bins (int, optional): Number of histogram bins for each descriptor. Should divide into 360. Defaults to 8.
+        lambda_ori (float, optional): Window Size of orientation calculation. Size equates to 6*lambda_ori*sigma. Defaults to 1.5.
+        n_bins (int, optional): Number of Histogram bins for the orientation calculation. Should divide into 360. Defaults to 36.
+        lambda_descr (float, optional): Area around each extrema, for which descriptors are calculated.
+        Size equates 2*lambda_descr*(n_hist+1)/n_hist*sigma. Defaults to 16.
+        n_hist (int, optional): number of histograms per axis. Defaults to 4.
+        n_ori (int, optional): Number of histogram bins for each descriptor. Should divide into 360. Defaults to 8.
         descriptor_gradient_threshold (float, optional): Histogram directions below this are set to 0 for each descriptor. Defaults to 0.2.
         show_plots (bool, optional): Shows Matplotlib plots for each step. Defaults to False.
 
@@ -687,28 +695,29 @@ def detect_and_compute(img: np.ndarray,
     # show_array(dogs, "Normalized DoGs")
     discrete_extremas = find_discrete_extremas(dogs)
     # show_extremas(dogs, discrete_extremas, "Discrete Extremas")
-    taylor_extremas = taylor_expansion(discrete_extremas, 
-                                       dogs, 
-                                       taylor_threshold, 
-                                       contrast_threshold, 
-                                       deltas, 
+    taylor_extremas = taylor_expansion(discrete_extremas,
+                                       dogs,
+                                       taylor_threshold,
+                                       c_dog,
+                                       deltas,
                                        sigmas)
     # show_extremas(dogs, taylor_extremas, "Taylor Extremas")
     filtered_extremas = filter_extremas(taylor_extremas,
-                                        dogs, contrast_threshold,
-                                        curvature_threshold)
+                                        dogs, c_dog,
+                                        c_edge)
     # show_extremas(dogs, filtered_extremas, "Filtered Extremas")
     key_points = assign_orientations(filtered_extremas,
                                      scale_space,
-                                     orientation_window_size,
-                                     orientation_bins,
-                                     deltas)
+                                     lambda_ori,
+                                     n_bins,
+                                     deltas,
+                                     sigmas)
     # show_extremas(scale_space, key_points, "Key Points", 0, 2, MAX_SCALE-1, True)
     descriptor_key_points = create_descriptors(key_points,
                                                scale_space,
-                                               descriptor_window_size,
-                                               descriptor_sub_window_size,
-                                               descriptor_bins,
+                                               lambda_descr,
+                                               n_hist,
+                                               n_ori,
                                                descriptor_gradient_threshold,
                                                deltas)
     # show_extremas(scale_space, descriptor_key_points, "Descriptor Key Points", 0, 2, MAX_SCALE-1, True, True)
