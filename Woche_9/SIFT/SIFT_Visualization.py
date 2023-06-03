@@ -101,18 +101,18 @@ def visualize_keypoints(scale_space: list[list[NDArray[np.float32]]],
     descriptors = []
     if use_keypoint_coordinates:
         for keypoint in EXTREMAS:
-            if keypoint.o == 1 and keypoint.s == CURRENT_SCALE:
-                keypoint_x.append(round(keypoint.x/deltas[keypoint.o-1]))
-                keypoint_y.append(round(keypoint.y/deltas[keypoint.o-1]))
-                quiver_x.append(np.cos(keypoint.theta*np.pi/180))#*keypoint.magnitude)
-                quiver_y.append(np.sin(keypoint.theta*np.pi/180))#*keypoint.magnitude)
+            if keypoint.o == 0 and keypoint.s == CURRENT_SCALE:
+                keypoint_x.append(round(keypoint.x/deltas[keypoint.o]))
+                keypoint_y.append(round(keypoint.y/deltas[keypoint.o]))
+                quiver_x.append(np.cos(keypoint.theta))#*keypoint.magnitude)
+                quiver_y.append(np.sin(keypoint.theta))#*keypoint.magnitude)
                 descriptors.append(keypoint.descriptor)
     else:
-        keypoint_x = [keypoint.m for keypoint in EXTREMAS if keypoint.o-1 == 0 and keypoint.s == CURRENT_SCALE]
-        keypoint_y = [keypoint.n for keypoint in EXTREMAS if keypoint.o-1 == 0 and keypoint.s == CURRENT_SCALE]
-        quiver_x = [np.cos(keypoint.theta*np.pi/180)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o-1 == 0 and keypoint.s == CURRENT_SCALE]
-        quiver_y = [np.sin(keypoint.theta*np.pi/180)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o-1 == 0 and keypoint.s == CURRENT_SCALE]
-        descriptors = [keypoint.descriptor for keypoint in EXTREMAS if keypoint.o-1 == 0 and keypoint.s == CURRENT_SCALE]
+        keypoint_x = [keypoint.m for keypoint in EXTREMAS if keypoint.o == 0 and keypoint.s == CURRENT_SCALE]
+        keypoint_y = [keypoint.n for keypoint in EXTREMAS if keypoint.o == 0 and keypoint.s == CURRENT_SCALE]
+        quiver_x = [np.cos(keypoint.theta)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o == 0 and keypoint.s == CURRENT_SCALE]
+        quiver_y = [np.sin(keypoint.theta)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o == 0 and keypoint.s == CURRENT_SCALE]
+        descriptors = [keypoint.descriptor for keypoint in EXTREMAS if keypoint.o == 0 and keypoint.s == CURRENT_SCALE]
     plt.scatter(keypoint_x, keypoint_y, c="r", s=1)
     # draw orientations
     if(SHOW_ORIENTATIONS):
@@ -146,18 +146,18 @@ def keypoint_on_click(event):
     descriptors = []
     if USE_KEYPOINT_COORDINATES:
         for keypoint in EXTREMAS:
-            if keypoint.o == CURRENT_OCTAVE+1 and keypoint.s == CURRENT_SCALE:
-                keypoint_x.append(round(keypoint.x/DELTAS[keypoint.o-1]))
-                keypoint_y.append(round(keypoint.y/DELTAS[keypoint.o-1]))
-                quiver_x.append(np.cos(keypoint.theta*np.pi/180))#*keypoint.magnitude)
-                quiver_y.append(np.sin(keypoint.theta*np.pi/180))#*keypoint.magnitude)
+            if keypoint.o == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE:
+                keypoint_x.append(round(keypoint.x/DELTAS[keypoint.o]))
+                keypoint_y.append(round(keypoint.y/DELTAS[keypoint.o]))
+                quiver_x.append(np.cos(keypoint.theta))#*keypoint.magnitude)
+                quiver_y.append(np.sin(keypoint.theta))#*keypoint.magnitude)
                 descriptors.append(keypoint.descriptor)
     else:
-        keypoint_x = [keypoint.m for keypoint in EXTREMAS if keypoint.o-1 == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
-        keypoint_y = [keypoint.n for keypoint in EXTREMAS if keypoint.o-1 == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
-        quiver_x = [np.cos(keypoint.theta*np.pi/180)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o-1 == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
-        quiver_y = [np.sin(keypoint.theta*np.pi/180)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o-1 == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
-        descriptors = [keypoint.descriptor for keypoint in EXTREMAS if keypoint.o-1 == 0 and keypoint.s == CURRENT_SCALE]
+        keypoint_x = [keypoint.m for keypoint in EXTREMAS if keypoint.o == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
+        keypoint_y = [keypoint.n for keypoint in EXTREMAS if keypoint.o == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
+        quiver_x = [np.cos(keypoint.theta)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
+        quiver_y = [np.sin(keypoint.theta)*keypoint.magnitude for keypoint in EXTREMAS if keypoint.o == CURRENT_OCTAVE and keypoint.s == CURRENT_SCALE]
+        descriptors = [keypoint.descriptor for keypoint in EXTREMAS if keypoint.o == 0 and keypoint.s == CURRENT_SCALE]
     event.canvas.figure.gca().scatter(keypoint_x, keypoint_y, c="r", s=1)
     if(SHOW_ORIENTATIONS):
         event.canvas.figure.gca().quiver(keypoint_x, keypoint_y, quiver_x, quiver_y)

@@ -25,27 +25,28 @@ def create_scale_space(u_in: NDArray[np.float32], sift_params: SIFT_Params) -> T
     scale_space: list[list[np.ndarray]] = []
     deltas: list[float] = [sift_params.delta_min]
     sigmas: list[list[float]] = [[sift_params.sigma_min]]
-    delta_prev = sift_params.delta_min
     # scale image up with bilinear interpolation
     u = cv.resize(u_in, (0,0), fx=1.0 / sift_params.delta_min, fy=1.0 / sift_params.delta_min, interpolation=cv.INTER_LINEAR)
     # first seed image blurred
-    v_1_0 = cv.GaussianBlur(u, (0,0), sift_params.sigma_min)
+    sigma_extra = np.sqrt(sift_params.sigma_min**2 - sift_params.sigma_in**2)/sift_params.delta_min
+    # ksize = (int(np.ceil(4*sigma_extra)),int(np.ceil(4*sigma_extra)))
+    v_1_0 = cv.GaussianBlur(u, (0,0), sigma_extra)
     first_octave: list[np.ndarray] = [v_1_0]
     
     # first octave calculation
     # delta_o equates to delta_min here
-    delta_o = sift_params.delta_min*2**(1-1)
     for s in range(1, sift_params.n_spo+3):
-        sigma = delta_o/sift_params.delta_min * sift_params.sigma_min*2**(s/sift_params.n_spo)
+        sigma = sift_params.sigma_min*pow(2.0,s/sift_params.n_spo)
+        sigma_extra = np.sqrt(sigma**2 - sigmas[0][s-1]**2)/sift_params.delta_min
         sigmas[0].append(sigma)
-        first_octave.append(cv.GaussianBlur(first_octave[s-1], (0,0), sigma))
+        first_octave.append(cv.GaussianBlur(first_octave[s-1], (0,0), sigma_extra))
     # and append octave
     scale_space.append(first_octave)
     
     # for every other octave excluding the first
     for o in range(2, sift_params.n_oct+1):
         # delta o
-        delta_o = sift_params.delta_min*2**(o-1)
+        delta_o = deltas[o-2]*2
         deltas.append(delta_o)
         # seed image is antepenultimate image of previous octave
         # o is 1-based, index is 0-based, therefore o-2
@@ -53,18 +54,18 @@ def create_scale_space(u_in: NDArray[np.float32], sift_params: SIFT_Params) -> T
         seed = scale_space[o-2][sift_params.n_spo-1]
         sigmas.append([sigmas[o-2][sift_params.n_spo-1]])
         # scale image down with bilinear interpolation
-        seed = cv.resize(seed, (0,0), fx=delta_prev / delta_o, fy=delta_prev / delta_o, interpolation=cv.INTER_LINEAR)
+        seed = cv.resize(seed, (0,0), fx=0.5, fy=0.5, interpolation=cv.INTER_LINEAR)
         current_octave: list[np.ndarray] = [seed]
         # for every scale level (n_spo+2)
         for s in range(1, sift_params.n_spo+3):
             # calculate sigma
-            sigma = delta_o/sift_params.delta_min * sift_params.sigma_min*2**(s/sift_params.n_spo)
+            sigma = delta_o/sift_params.delta_min*sift_params.sigma_min*pow(2.0, s/sift_params.n_spo)
+            sigma_extra = np.sqrt(sigma**2 - sigmas[o-1][s-1]**2)/delta_o
             sigmas[o-1].append(sigma)
             # and apply blur to previous scale image
-            current_octave.append(cv.GaussianBlur(current_octave[s-1], (0,0), sigma))
+            current_octave.append(cv.GaussianBlur(current_octave[s-1], (0,0), sigma_extra))
         # and append octave
         scale_space.append(current_octave)
-        delta_prev = delta_o
     return scale_space, deltas, sigmas
 
 def create_dogs(scale_space: list[list[NDArray[np.float32]]], sift_params: SIFT_Params) -> list[list[NDArray[np.float32]]]:
@@ -89,7 +90,7 @@ def create_dogs(scale_space: list[list[NDArray[np.float32]]], sift_params: SIFT_
         dogs.append(dog_row)
     return dogs
 
-def find_discrete_extremas(dogs: list[list[NDArray[np.float32]]], sift_params: SIFT_Params) -> list[KeyPoint]:
+def find_discrete_extremas(dogs: list[list[NDArray[np.float32]]], sift_params: SIFT_Params, sigmas: list[list[float]], deltas: list[float]) -> list[KeyPoint]:
     """Finds the discrete extremas for a given difference of gaussians
 
     Args:
@@ -101,9 +102,9 @@ def find_discrete_extremas(dogs: list[list[NDArray[np.float32]]], sift_params: S
     """
     extremas = []
     # for each octave in dogs
-    for o in range(1, sift_params.n_oct+1):
+    for o in range(0, sift_params.n_oct):
         print(f"Extrema Calculation: Octave {o}")
-        octave = dogs[o-1] # 0-based index
+        octave = dogs[o] # 0-based index
         # for each dog image in the octave excluding first and last image
         for s in range(1, sift_params.n_spo+1):
             # the current dog image
@@ -127,9 +128,7 @@ def find_discrete_extremas(dogs: list[list[NDArray[np.float32]]], sift_params: S
                     # if the current pixel is local minimum or maximum
                     if(np.max(neighbours) < current[n,m] or np.min(neighbours) > current[n,m]):
                         # create new local extremum
-                        extremas.append(KeyPoint(o,s,m,n))
-    # results in MAX_SCALE-3 possible extrema images per octave
-    # since we cannot take 1st and last image of each octave
+                        extremas.append(KeyPoint(o,s,m,n,sigmas[o][s], deltas[o]*m, deltas[o]*n))
     return extremas
 
 def taylor_expansion(extremas: list[KeyPoint],
@@ -151,11 +150,8 @@ def taylor_expansion(extremas: list[KeyPoint],
     new_extremas = []
     for extremum in extremas:
         # discard low contrast candiate keypoints
-        if(abs(dog_scales[extremum.o-1][extremum.s][extremum.n, extremum.m]) < 0.8 * sift_params.C_DoG):
+        if(abs(dog_scales[extremum.o][extremum.s][extremum.n, extremum.m]) < 0.8 * sift_params.C_DoG):
             continue
-        # locations are 0-based
-        # attention when calculating with values
-        # s is 1 based, as there exists the seed image infront
         s = extremum.s
         m = extremum.m
         n = extremum.n
@@ -163,9 +159,9 @@ def taylor_expansion(extremas: list[KeyPoint],
         # will break if new location is found
         # will be adjusted maximum 5 times
         for _ in range(5):
-            current = dog_scales[extremum.o-1][s]
-            previous = dog_scales[extremum.o-1][s-1]
-            next_scale = dog_scales[extremum.o-1][s+1]
+            current = dog_scales[extremum.o][s]
+            previous = dog_scales[extremum.o][s-1]
+            next_scale = dog_scales[extremum.o][s+1]
             # called $\bar{g}^o_{s,m,n}$ in the paper
             # represent the first derivative  in a finite difference scheme
             # is Transposed, as we calculate [a,b,c] values, but want [[a],[b],[c]]
@@ -194,7 +190,7 @@ def taylor_expansion(extremas: list[KeyPoint],
             # the every value is below the drop_off
             # we found the new location
             if(np.max(np.abs(alpha)) < 0.6):
-                if (alpha[0,0] > 0.6 and s+1 < len(dog_scales[extremum.o-1])-1):
+                if (alpha[0,0] > 0.6 and s+1 < len(dog_scales[extremum.o])-1):
                     s += 1
                 elif(alpha[0,0] < -0.6 and s-1 > 0):
                     s -= 1
@@ -210,11 +206,11 @@ def taylor_expansion(extremas: list[KeyPoint],
                 # to 'w+0.5*alphaT*g' following the paper
                 # pseudocode does not simplify here
                 # omega represent the value of the DoG interpolated extremum
-                omega = current[extremum.n, extremum.m] + 0.5*alpha.T*g_o_smn
+                omega = current[extremum.n, extremum.m] + 0.5*(g_o_smn[0,0]*alpha[0,0]+g_o_smn[1,0]*alpha[1,0]+g_o_smn[2,0]*alpha[2,0])
                 # calculate the current delta and sigma for the corresponding new location
-                delta_oe = deltas[extremum.o-1]
+                delta_oe = deltas[extremum.o]
                 # sigma is calculated from the scale
-                sigma = sigmas[extremum.o-1][s]* pow(sigmas[0][1]-sigmas[0][0], alpha[0,0])
+                sigma = sigmas[extremum.o][s]* pow(sigmas[0][1]-sigmas[0][0], alpha[0,0])
                 # and the keypoint coordinates
                 x = delta_oe*(alpha[1,0]+m)
                 y = delta_oe*(alpha[2,0]+n)
@@ -224,7 +220,7 @@ def taylor_expansion(extremas: list[KeyPoint],
                 break
             # if the new location is valid, update the locations in that direction
             # at least one value will be adjust (as at least one is >0.6)
-            if (alpha[0,0] > 0.6 and s+1 < len(dog_scales[extremum.o-1])-1):
+            if (alpha[0,0] > 0.6 and s+1 < len(dog_scales[extremum.o])-1):
                 s += 1
             elif(alpha[0,0] < -0.6 and s-1 > 0):
                 s -= 1
@@ -256,7 +252,7 @@ def filter_extremas(extremas: list[KeyPoint], dogs: list[list[NDArray[np.float32
         m = extremum.m
         n = extremum.n
         # current dog image
-        current = dogs[extremum.o-1][s]
+        current = dogs[extremum.o][s]
         
         # contrast drop off from the calculate omega value of taylor expansion
         if(abs(extremum.omega) < sift_params.C_DoG):
@@ -281,7 +277,7 @@ def filter_extremas(extremas: list[KeyPoint], dogs: list[list[NDArray[np.float32
         edgeness = (trace*trace)/determinant
         
         # curvature drop off
-        if(edgeness >= ((sift_params.C_edge+1)**2)/sift_params.C_edge):
+        if(abs(edgeness) >= ((sift_params.C_edge+1)**2)/sift_params.C_edge):
             continue
         
         filtered_extremas.append(extremum)
@@ -289,15 +285,35 @@ def filter_extremas(extremas: list[KeyPoint], dogs: list[list[NDArray[np.float32
 
 def gradient_2d(scale_space: list[list[NDArray[np.float32]]], sift_params: SIFT_Params) -> dict[Tuple[int, int, int, int], Tuple[float, float]]:
     gradients: dict[Tuple[int, int, int, int], Tuple[float, float]] = {}
-    for o in range(1, sift_params.n_oct+1):
-        for s in range(1, sift_params.n_spo+1):
-            v_o_s = scale_space[o-1][s]
-            for m in range(1, v_o_s.shape[1]-1):
-                for n in range(1, v_o_s.shape[0]-1):
-                    delta_m = (v_o_s[n, m+1]-v_o_s[n, m-1])/2
-                    delta_n = (v_o_s[n+1, m]-v_o_s[n-1, m])/2
+    for o in range(0, sift_params.n_oct):
+        for s in range(0, sift_params.n_spo+3):
+            v_o_s = scale_space[o][s]
+            for m in range(0, v_o_s.shape[1]):
+                for n in range(0, v_o_s.shape[0]):
+                    if (m < 1):
+                        delta_m = (v_o_s[n, v_o_s.shape[1]-1]-v_o_s[n, 0]) / 2
+                    elif (m > v_o_s.shape[1]-2):
+                        delta_m = (v_o_s[n, 0]-v_o_s[n, v_o_s.shape[1]-1]) / 2
+                    else:
+                        delta_m = (v_o_s[n, m+1]-v_o_s[n, m-1])/2
+                    if(n < 1):
+                        delta_n = (v_o_s[v_o_s.shape[0]-1, m]-v_o_s[0, m]) / 2
+                    elif(n > v_o_s.shape[0]-2):
+                        delta_n = (v_o_s[0, m]-v_o_s[v_o_s.shape[0]-1, m]) / 2
+                    else:
+                        delta_n = (v_o_s[n+1, m]-v_o_s[n-1, m])/2
                     gradients[(o, s, m, n)] = (delta_m, delta_n)
     return gradients
+
+def float_modulo(val: float, mod: float):
+    z: float = val
+    n: int = 0
+    if (z < 0):
+        n = int((-z)/mod)+1
+        z += n*mod
+    n = int(z/mod)
+    z -= n*mod
+    return z
 
 def assign_orientations(keypoints: list[KeyPoint], 
                         scale_space: list[list[NDArray[np.float32]]],
@@ -320,10 +336,10 @@ def assign_orientations(keypoints: list[KeyPoint],
     new_keypoints = []
     
     for keypoint in keypoints:
-        image = scale_space[keypoint.o-1][keypoint.s]
-        key_x = keypoint.x / deltas[keypoint.o-1]
-        key_y = keypoint.y / deltas[keypoint.o-1]
-        key_sigma = keypoint.sigma / deltas[keypoint.o-1]
+        image = scale_space[keypoint.o][keypoint.s]
+        key_x = keypoint.x / deltas[keypoint.o]
+        key_y = keypoint.y / deltas[keypoint.o]
+        key_sigma = keypoint.sigma / deltas[keypoint.o]
         border_limit = 3*sift_params.lambda_ori*key_sigma
         if(border_limit <= key_x and
            key_x <= image.shape[1]-border_limit and
@@ -339,7 +355,7 @@ def assign_orientations(keypoints: list[KeyPoint],
                     magnitude = np.sqrt(delta_m*delta_m+delta_n*delta_n)
                     # calculate gaussian weight
                     weight = np.exp((-(sM*sM+sN*sN))/(2*(sift_params.lambda_ori**2)))
-                    angle = np.arctan2(delta_m, delta_n)
+                    angle = float_modulo(np.arctan2(delta_m, delta_n), 2*np.pi)
                     # calculate histogram index
                     # histogram is 0-based, but calculation is 1-based
                     if(angle < 0):
@@ -353,13 +369,15 @@ def assign_orientations(keypoints: list[KeyPoint],
             # extract reference orientation
             max_h_k = np.max(h_k)
             for k in range(sift_params.n_bins):
-                prev_hist = h_k[(k-1)%sift_params.n_bins]
+                prev_hist = h_k[(k-1+sift_params.n_bins)%sift_params.n_bins]
                 next_hist = h_k[(k+1)%sift_params.n_bins]
                 if(h_k[k] > prev_hist and h_k[k] > next_hist and h_k[k] >= sift_params.t*max_h_k):
-                    theta_k = (2*np.pi*k)/sift_params.n_bins
-                    angle = theta_k+(np.pi/sift_params.n_bins)*((prev_hist-next_hist)/(prev_hist-2*h_k[k]+next_hist))
-                    keypoint.theta = angle
-                    new_keypoints.append(keypoint)
+                    offset: float = (prev_hist - next_hist)/(2*(prev_hist+next_hist-2*h_k[k]))
+                    angle = (k+offset+0.5)*2*np.pi/sift_params.n_bins
+                    if(angle > 2*np.pi):
+                        angle -= 2*np.pi
+                    new_keypoint = KeyPoint(keypoint.o, keypoint.s, keypoint.m, keypoint.n, keypoint.sigma, keypoint.x, keypoint.y, keypoint.omega, angle, keypoint.magnitude)
+                    new_keypoints.append(new_keypoint)
     return new_keypoints
 
 def create_descriptors(keypoints: list[KeyPoint],
@@ -385,11 +403,12 @@ def create_descriptors(keypoints: list[KeyPoint],
     # calculate gradients for each scale
     #gradient_2d = scale_space_gradients(scale_space, get_limit)
     for keypoint in keypoints:
-        image = scale_space[keypoint.o-1][keypoint.s]
-        key_x = keypoint.x / deltas[keypoint.o-1]
-        key_y = keypoint.y / deltas[keypoint.o-1]
-        key_sigma = keypoint.sigma / deltas[keypoint.o-1]
-        relative_patch_size = sift_params.lambda_descr*key_sigma*(sift_params.n_hist+1)/sift_params.n_hist
+        image = scale_space[keypoint.o][keypoint.s]
+        key_x = keypoint.x / deltas[keypoint.o]
+        key_y = keypoint.y / deltas[keypoint.o]
+        key_sigma = keypoint.sigma / deltas[keypoint.o]
+        
+        relative_patch_size = (1+1/sift_params.n_hist)*sift_params.lambda_descr*key_sigma
         border_limit = np.sqrt(2)*relative_patch_size
         if(border_limit <= key_x and
            key_x <= image.shape[1]-border_limit and
@@ -398,26 +417,24 @@ def create_descriptors(keypoints: list[KeyPoint],
             histograms = [[np.zeros(sift_params.n_ori) for _ in range(sift_params.n_hist)] for _ in range(sift_params.n_hist)]
             for m in range(max(0, int(key_x - border_limit + 0.5)), min(image.shape[1]-1, int(key_x + border_limit + 0.5))):
                 for n in range(max(0, int(key_y - border_limit + 0.5)), min(image.shape[0]-1, int(key_y + border_limit + 0.5))):
-                    x = m - key_x
-                    y = n - key_y
-                    x_vedge_mn = np.cos(keypoint.theta)*x-np.sin(keypoint.theta)*y
-                    y_vedge_mn = np.sin(keypoint.theta)*x+np.cos(keypoint.theta)*y
+                    x_vedge_mn = np.cos(-keypoint.theta)*(m - key_x)-np.sin(-keypoint.theta)*(n - key_y)
+                    y_vedge_mn = np.sin(-keypoint.theta)*(m - key_x)+np.cos(-keypoint.theta)*(n - key_y)
                     
                     if(max(abs(x_vedge_mn),abs(y_vedge_mn)) < relative_patch_size):
                         delta_m, delta_n = gradients[(keypoint.o, keypoint.s, m, n)]
-                        theta_mn = (np.arctan2(delta_m, delta_n) - keypoint.theta)%(2*np.pi)
+                        theta_mn = float_modulo((np.arctan2(delta_m, delta_n) - keypoint.theta), 2*np.pi)
                         magnitude = np.sqrt(delta_m*delta_m+delta_n*delta_n)
-                        weight = np.exp(-(x*x+y*y)/(2*(sift_params.lambda_descr*key_sigma)**2))
+                        weight = np.exp(-(x_vedge_mn*x_vedge_mn+y_vedge_mn*y_vedge_mn)/(2*(sift_params.lambda_descr*key_sigma)**2))
                         
-                        alpha = x/(2*sift_params.lambda_descr*key_sigma/sift_params.n_hist) + (sift_params.n_hist-1)/2
-                        beta = y/(2*sift_params.lambda_descr*key_sigma/sift_params.n_hist) + (sift_params.n_hist-1)/2
+                        alpha = x_vedge_mn/(2*sift_params.lambda_descr*key_sigma/sift_params.n_hist) + (sift_params.n_hist-1)/2
+                        beta = y_vedge_mn/(2*sift_params.lambda_descr*key_sigma/sift_params.n_hist) + (sift_params.n_hist-1)/2
                         gamma = theta_mn / (2*np.pi)*sift_params.n_ori
-                        for i  in range(max(0, int(alpha), min(int(alpha)+2, sift_params.n_hist))):
-                                for j in range(max(0, int(beta)), min(int(beta)+2, sift_params.n_hist)):
+                        for i  in range(max(0, int(alpha), min(int(alpha)+1, sift_params.n_hist-1)+1)):
+                                for j in range(max(0, int(beta)), min(int(beta)+1, sift_params.n_hist-1)+1):
                                     k = (int(gamma)+sift_params.n_ori)%sift_params.n_ori
-                                    histograms[i][j][k] += (1. - (gamma-int(gamma)))*(1. - abs(float(i-alpha)))*(1. - abs(float(j-beta)))*weight*magnitude
+                                    histograms[i][j][k] += (1. - (gamma-np.floor(gamma)))*(1. - abs(float(i-alpha)))*(1. - abs(float(j-beta)))*weight*magnitude
                                     k = (int(gamma)+1+sift_params.n_ori)%sift_params.n_ori
-                                    histograms[i][j][k] += (1. - (gamma-int(gamma)))*(1. - abs(float(i-alpha)))*(1. - abs(float(j-beta)))*weight*magnitude
+                                    histograms[i][j][k] += (1. - (gamma-np.floor(gamma)))*(1. - abs(float(i-alpha)))*(1. - abs(float(j-beta)))*weight*magnitude
             f = np.array(histograms).flatten()
             f_norm = np.linalg.norm(f, 2)
             for l in range(0,f.shape[0]):
@@ -449,7 +466,7 @@ def detect_and_compute(img: NDArray[np.float32],
     scale_space, deltas, sigmas = create_scale_space(img, sift_params)
     dogs = create_dogs(scale_space, sift_params)
     normalized_dogs = [[cv.normalize(d, None, 0, 1, cv.NORM_MINMAX) for d in octave] for octave in dogs] # type: ignore
-    discrete_extremas = find_discrete_extremas(dogs, sift_params)
+    discrete_extremas = find_discrete_extremas(dogs, sift_params, sigmas, deltas)
     taylor_extremas = taylor_expansion(discrete_extremas,
                                        dogs,
                                        sift_params,
@@ -477,7 +494,7 @@ def detect_and_compute(img: NDArray[np.float32],
         visualize_keypoints(dogs, taylor_extremas, "Taylor Extremas", sift_params.n_spo+1)
         visualize_keypoints(dogs, filtered_extremas, "Filtered Extremas", sift_params.n_spo+1)
         visualize_keypoints(scale_space, key_points, "Key Points", sift_params.n_spo+1, 0, True, deltas, sift_params, True)
-        visualize_keypoints(scale_space, descriptor_key_points, "Descriptor Key Points", sift_params.n_spo+1, 0, True, deltas, sift_params, True)
+        visualize_keypoints(scale_space, descriptor_key_points, "Descriptor Key Points", sift_params.n_spo+1, 0, True, deltas, sift_params, True, True)
     
     return scale_space, normalized_dogs, descriptor_key_points
 
@@ -503,7 +520,7 @@ def match_keypoints(keypoints_a: list[KeyPoint], keypoints_b: list[KeyPoint], si
             if(distance < sift_params.C_match_absolute):
                 distances.append(distance)
                 key_points.append(keypoint_b)
-        if(len(distances) == 0):
+        if(len(distances) < 2):
             continue
         distances = np.array(distances)
         # find minimum distance
