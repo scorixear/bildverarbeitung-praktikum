@@ -1,5 +1,7 @@
 from numpy.typing import NDArray
 import numpy as np
+from SIFT_Params import SIFT_Params
+from typing import Tuple
 class KeyPoint:
     def __init__(self, 
                  o: int,
@@ -44,3 +46,16 @@ class KeyPoint:
 
     def __repr__(self):
         return f"[m: {self.m}, n: {self.n}, o: {self.o}, s: {self.s}, x: {self.x}, y: {self.y}, sigma: {self.sigma}, omega: {self.omega}, ori: {self.theta}, mag: {self.magnitude}]"
+    def find_nearest_scale(self,
+                       sigmas: list[list[float]],
+                       sift_params: SIFT_Params) -> Tuple[int, int]:
+        min_scale = float("inf")
+        min_o = -1
+        min_s = -1
+        for o in range(1, sift_params.n_oct+1):
+            for s in range(1, sift_params.n_spo+1):
+                if(abs(sigmas[o-1][s] - self.sigma) < min_scale):
+                    min_scale = sigmas[o-1][s]
+                    min_o = o
+                    min_s = s
+        return min_o, min_s

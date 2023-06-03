@@ -1,3 +1,4 @@
+from typing import Tuple
 class SIFT_Params:
     def __init__(self,
                  n_oct: int = 4,
@@ -12,7 +13,9 @@ class SIFT_Params:
                  t: float = 0.8,
                  n_hist: int = 4,
                  n_ori: int = 8,
-                 lambda_descr: float = 6):
+                 lambda_descr: float = 6,
+                 C_match_absolute: float = 300,
+                 C_match_relative: float = 0.6):
         """Represents all Hyperparameters for SIFT
 
         Args:
@@ -43,7 +46,5 @@ class SIFT_Params:
         self.n_hist = n_hist
         self.n_ori = n_ori
         self.lambda_descr = lambda_descr
-    def get_orientation_patch_width(self, sigma):
-        return 6*self.lambda_ori*sigma
-    def get_descriptor_patch_width(self, sigma):
-        return 2*self.lambda_descr*sigma
+        self.C_match_absolute = C_match_absolute
+        self.C_match_relative = C_match_relative
