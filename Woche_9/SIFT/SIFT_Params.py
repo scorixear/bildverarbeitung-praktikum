@@ -1,5 +1,6 @@
-from typing import Tuple
 class SIFT_Params:
+    """Represents all Hyperparameters for SIFT
+    """
     def __init__(self,
                  n_oct: int = 4,
                  n_spo: int = 3,
@@ -32,6 +33,8 @@ class SIFT_Params:
             n_hist (int, optional): Number of Histograms in the normalized patch (n_hist**2). Defaults to 4.
             n_ori (int, optional): Number of bins in the descriptor histogram. Defaults to 8.
             lambda_descr (float, optional): Sets how local the descriptor ist. Patch width is 2*lambda_descr*sigma. Defaults to 6.
+            C_match_absolute (float, optional): Threshold for absolute distance between two descriptors. Defaults to 300.
+            C_match_relative (float, optional): Threshold for relative distance between two descriptors. Defaults to 0.6.
         """
         self.n_oct = n_oct
         self.n_spo = n_spo
