@@ -15,7 +15,7 @@ class SIFT_Algorithm:
     'Represents the SIFT algorithm\n    '
     # Methods are obfuscated by purpose as they are meant to be used only for comparison
     @staticmethod
-    def create_scale_space(u_in: A.ndarray,sift_params: SIFT_Params) -> Tuple[list[list[A.ndarray]], list[Q], list[list[Q]]]:
+    def create_scale_space(u_in,sift_params):
         'Creates a scale space for a given image\n\n        Args:\n            u_in (np.ndarray): the image\n            sift_Params (SIFT_Params): the sift parameters\n\n        Returns:\n            Tuple[list[list[np.ndarray]], list[float], list[list[float]]]: the scale space divide into octave - scales - images, the delta values and the sigma values\n        ';B=sift_params;K=[];L=[B.delta_min];C=[[B.sigma_min]];R=E.resize(u_in,(0,0),fx=J/B.delta_min,fy=J/B.delta_min,interpolation=E.INTER_LINEAR);G=A.sqrt(B.sigma_min**2-B.sigma_in**2)/B.delta_min;S=E.GaussianBlur(R,(0,0),G);M=[S]
         for F in D(1,B.n_spo+3):H=B.sigma_min*O(2.,F/B.n_spo);G=A.sqrt(H**2-C[0][F-1]**2)/B.delta_min;C[0].append(H);M.append(E.GaussianBlur(M[F-1],(0,0),G))
         K.append(M)

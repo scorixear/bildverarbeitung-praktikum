@@ -134,7 +134,7 @@ aside > *:last-child {
 <li>Berechnen Sie aus dem erstellten Scale Space die DoG-Bilder</li>
 <li>Finden Sie lokale Extrema in den DoG-Bildern</li>
 </ul>
-<p>Führen sie alle Schritte des SIFT-Algorithmus in richtiger Reihenfolge aus. Benutzen Sie hierfür ihre eigenen Methoden und die Methoden aus <code>SIFT_algo.py</code>.</p>
+<p>Führen Sie alle Schritte des SIFT-Algorithmus in richtiger Reihenfolge aus. Benutzen Sie hierfür Ihre eigenen Methoden und die Methoden aus <code>SIFT_algo.py</code>.</p>
 <p>Das Matching der Keypoints ist nicht Teil dieser Aufgabe. Sie müssen keine Keypoints vergleichen.</p>
 <h3 id="sift-implementierung">SIFT-Implementierung</h3>
 <p>Bevor Sie mit der Implementierung beginnen, hier noch ein paar Informationen über den Source-Code aus Moodle.</p>
@@ -145,13 +145,14 @@ aside > *:last-child {
 <li><code>SIFT_Visualization.py</code> enthält zwei Methoden, welche die Scale-Space und die dazugehörigen Keypoints / Extrema visualisieren.</li>
 </ul>
 <p>Die Klasse <code>SIFT_Params</code> enthält alle Parameter, die Sie für den SIFT-Algorithmus benötigen. Die Parameter sind bereits mit Standardwerten initialisiert und müssen eigentlich nicht geändert werden.<br>
-<em>Hinweis:</em> Der Scale Space sollte in seiner letzten Oktave ein Bild mit mindestens 12 Pixeln Breite und Länge enthalten. Wählen Sie deshalb ein Bild mit genügend Pixeln aus, aber halten Sie das Bild so klein wie möglich. Das beschleunigt die Berechnung deutlich.<br>
+<em>Hinweis:</em> Der Scale Space sollte in seiner letzten Oktave ein Bild mit mindestens 12 Pixeln Breite und Länge enthalten. Wählen Sie deshalb ein Bild mit genügend Pixeln aus, aber halten Sie das Bild so klein wie möglich. Das beschleunigt die Berechnung deutlich. Empfohlen hier ist ein 128x128 Bild.<br>
 <em>Hinweis 2:</em> Der SIFT Algorithmus erwartet Graustufenbilder mit Werten im Intervall [0,1]. Transformieren Sie ihr Bild dementsprechend.</p>
 <p>Die Klasse <code>SIFT_KeyPoint</code> enthält alle Informationen, die der SIFT-Algorithmus benötigt.
 Viele dieser Variablen sind jedoch nicht für Sie wichtig. Sie sollten lediglich die Variablen <code>o</code>=Oktave, <code>s</code>=Scale, <code>m</code>=x-Koordinate und <code>n</code>=y-Koordinate setzen. Die anderen Variablen werden von der Klasse <code>SIFT_Algorithm</code> gesetzt.</p>
 <p>Zur Visualisierung können Sie die Methoden <code>visualize_scale_space</code> und <code>visualize_keypoints</code> aus der Datei <code>SIFT_Visualization.py</code> nutzen.
 Die Methode <code>visualize_scale_space</code> zeigt Ihnen den kompletten Scale-Space in einem Plot an.
-Die Methode <code>visualize_keypoints</code> legt Extrema/Keypoints auf diesen Scale-Space.</p>
+Die Methode <code>visualize_keypoints</code> legt Extrema/Keypoints auf diesen Scale-Space.<br>
+<em>Hinweis:</em> Für eine bessere Darstellung bietet es sich an, die Extrema auf den normalisierten DoG-Bildern anzuzeigen, die KeyPoints jedoch auf der Urspünglichen Skala. Alle <code>SIFT-algo.py</code> Methoden sollten jedoch immer mit nicht-normalisierten DoG oder Skala-Bildern arbeiten.</p>
 <p>Ihre Implementierung sollte drei Methoden umfassen, die ebenso in <code>SIFT_algo.py</code> zu finden sind: <code>create_scale_space</code>, <code>create_dogs</code> und <code>find_discrete_extremas</code>. Entscheiden Sie selbst, welche Parameter diese Methoden benötigen. Ihre Extrema sollten vom Typ <code>SIFT_Keypoint</code> sein.<br>
 <em>Hinweis:</em> Weitere Methoden des SIFT-Algorithmus <code>SIFT_algo.py</code> benötigen die zusätzlichen Variablen <code>deltas</code> und <code>sigmas</code>. Diese Variablen sollten während <code>create_scale_space</code> erstellt werden.</p>
 

@@ -20,7 +20,7 @@ Folgende Schritte sollten implementiert werden:
 - Berechnen Sie aus dem erstellten Scale Space die DoG-Bilder
 - Finden Sie lokale Extrema in den DoG-Bildern
 
-Führen Sie alle Schritte des SIFT-Algorithmus in richtiger Reihenfolge aus. Benutzen Sie hierfür ihre eigenen Methoden und die Methoden aus `SIFT_algo.py`.
+Führen Sie alle Schritte des SIFT-Algorithmus in richtiger Reihenfolge aus. Benutzen Sie hierfür Ihre eigenen Methoden und die Methoden aus `SIFT_algo.py`.
 
 Das Matching der Keypoints ist nicht Teil dieser Aufgabe. Sie müssen keine Keypoints vergleichen.
 
@@ -33,7 +33,7 @@ Bevor Sie mit der Implementierung beginnen, hier noch ein paar Informationen üb
 - `SIFT_Visualization.py` enthält zwei Methoden, welche die Scale-Space und die dazugehörigen Keypoints / Extrema visualisieren.
 
 Die Klasse `SIFT_Params` enthält alle Parameter, die Sie für den SIFT-Algorithmus benötigen. Die Parameter sind bereits mit Standardwerten initialisiert und müssen eigentlich nicht geändert werden.\
-_Hinweis:_ Der Scale Space sollte in seiner letzten Oktave ein Bild mit mindestens 12 Pixeln Breite und Länge enthalten. Wählen Sie deshalb ein Bild mit genügend Pixeln aus, aber halten Sie das Bild so klein wie möglich. Das beschleunigt die Berechnung deutlich.\
+_Hinweis:_ Der Scale Space sollte in seiner letzten Oktave ein Bild mit mindestens 12 Pixeln Breite und Länge enthalten. Wählen Sie deshalb ein Bild mit genügend Pixeln aus, aber halten Sie das Bild so klein wie möglich. Das beschleunigt die Berechnung deutlich. Empfohlen hier ist ein 128x128 Bild.\
 _Hinweis 2:_ Der SIFT Algorithmus erwartet Graustufenbilder mit Werten im Intervall [0,1]. Transformieren Sie ihr Bild dementsprechend.
 
 Die Klasse `SIFT_KeyPoint` enthält alle Informationen, die der SIFT-Algorithmus benötigt.
@@ -41,7 +41,8 @@ Viele dieser Variablen sind jedoch nicht für Sie wichtig. Sie sollten lediglich
 
 Zur Visualisierung können Sie die Methoden `visualize_scale_space` und `visualize_keypoints` aus der Datei `SIFT_Visualization.py` nutzen.
 Die Methode `visualize_scale_space` zeigt Ihnen den kompletten Scale-Space in einem Plot an.
-Die Methode `visualize_keypoints` legt Extrema/Keypoints auf diesen Scale-Space.
+Die Methode `visualize_keypoints` legt Extrema/Keypoints auf diesen Scale-Space.\
+_Hinweis:_ Für eine bessere Darstellung bietet es sich an, die Extrema auf den normalisierten DoG-Bildern anzuzeigen, die KeyPoints jedoch auf der Urspünglichen Skala. Alle `SIFT-algo.py` Methoden sollten jedoch immer mit nicht-normalisierten DoG oder Skala-Bildern arbeiten.
 
 Ihre Implementierung sollte drei Methoden umfassen, die ebenso in `SIFT_algo.py` zu finden sind: `create_scale_space`, `create_dogs` und `find_discrete_extremas`. Entscheiden Sie selbst, welche Parameter diese Methoden benötigen. Ihre Extrema sollten vom Typ `SIFT_Keypoint` sein.\
 _Hinweis:_ Weitere Methoden des SIFT-Algorithmus `SIFT_algo.py` benötigen die zusätzlichen Variablen `deltas` und `sigmas`. Diese Variablen sollten während `create_scale_space` erstellt werden.
