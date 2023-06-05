@@ -1,6 +1,6 @@
 from numpy.typing import NDArray
 import numpy as np
-class KeyPoint:
+class SIFT_KeyPoint:
     """Represents Extrema / Keypoint
     """
     def __init__(self, 

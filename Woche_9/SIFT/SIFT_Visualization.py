@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
 import numpy as np
-from SIFT_KeyPoint import KeyPoint
+from SIFT_KeyPoint import SIFT_KeyPoint
 
 def visualize_scale_space(array: list[list[NDArray[np.float32]]], title: str):
     px = 1/plt.rcParams['figure.dpi']  # pixel in inches
@@ -14,7 +14,7 @@ def visualize_scale_space(array: list[list[NDArray[np.float32]]], title: str):
     plt.show()
     
 def visualize_keypoints(scale_space: list[list[NDArray[np.float32]]],
-                  keypoints: list[KeyPoint],
+                  keypoints: list[SIFT_KeyPoint],
                   deltas: list[float],
                   title: str,
                   use_keypoint_coordinates: bool = False,
