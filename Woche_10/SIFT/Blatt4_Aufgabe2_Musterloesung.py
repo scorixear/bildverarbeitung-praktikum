@@ -78,7 +78,7 @@ def rotate_image(img: np.ndarray, angle: int):
 
 def main():
     # read in image
-    img = cv.imread("Woche_9/cat.jpg")
+    img = cv.imread("Woche_10/cat.jpg")
     # resize image for faster processing
     img = cv.resize(img, (128, 104))
     # convert to gray scale
