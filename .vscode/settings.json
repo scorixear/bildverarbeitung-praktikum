@@ -2,5 +2,9 @@
   "python.linting.pylintEnabled": false,
   "python.linting.enabled": false,
   "python.linting.pylamaEnabled": true,
-  "python.analysis.typeCheckingMode": "basic"
+  "python.analysis.typeCheckingMode": "basic",
+  "editor.codeActionsOnSave": {
+    
+    "source.fixAll.eslint": false
+  },
 }
