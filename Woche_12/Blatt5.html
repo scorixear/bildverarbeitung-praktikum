@@ -128,7 +128,7 @@ dazu gerne die Beispielbilder aus Moodle und setzen sie die Marker per Hand.</p>
 Optional können Sie sich die Datei <code>Maximum_Likelihood.py</code> aus Moodle herunterladen und diese nutzen, um die Ergebnisse zu optimieren. Nutzen Sie hierfür die Methode <code>optimize()</code> aus der Datei.</p>
 <p>Ihr Ergebniss sollte sowohl eine Rotations/Translations Matrix, als auch die Matritzen A, B und H (Homography) aus der Vorlesung sein. Mit Hilfe der <code>optimize()</code> Methode erhalten Sie die optimierten Matritzen A und D (Distortion Coefficients), mit deren Sie die Bilder mit der Methode <code>cv2.undistort(image, A, D)</code> entzerren können.</p>
 <p><strong>Wichtig:</strong> Die Methode <code>optimize()</code> benötigt eine Mindestanzahl an Bildern, nutzen Sie deshalb am besten alle Bilder aus der Zip-Datei <code>chess_images.zip</code>.</p>
-<p><strong>Hinweis:</strong> Die Schach-Bilder aus der Datei <code>chess-images.zip</code> haben eine Größe von [6,9]. Sie sollten also mit <code>cv2.findChessboardCorners()</code> 54 Marker finden. Die Weltkoordinaten sollten ebenso 54 an der Zahl sein. Die Länge des Schachbrett-Quadrats beträgt <code>12.5mm</code>, dies benötigen Sie zur Berechnung der Weltkoordinaten.</p>
+<p><strong>Hinweis:</strong> Die Schach-Bilder aus der Datei <code>chess-images.zip</code> haben eine Größe von [6,9]. Sie sollten also mit <code>cv2.findChessboardCorners()</code> 54 Marker finden. Die Weltkoordinaten sollten ebenso 54 an der Zahl sein. Die Länge eines Schachbrett-Quadrats beträgt <code>12.5mm</code>, dies benötigen Sie zur Berechnung der Weltkoordinaten.</p>
 
         
         
