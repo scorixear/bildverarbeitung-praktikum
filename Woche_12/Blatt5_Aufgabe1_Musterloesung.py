@@ -1,6 +1,6 @@
+import random
 import numpy as np
 import matplotlib.pyplot as plt
-import random
 import cv2 as cv
 
 def main():

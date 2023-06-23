@@ -39,7 +39,7 @@ class SIFT_Algorithm:
         # we therefore let cv calculate the kernel size
         # ksize = (int(np.ceil(4*sigma_extra)),int(np.ceil(4*sigma_extra)))
         
-        # this representa the first scale image of the first octave
+        # this represents the first scale image of the first octave
         # in the paper the octave are counted from 1 to n_oct
         # and scales from 0 to n_spo+2
         v_1_0: np.ndarray = cv.GaussianBlur(u, (0,0), sigma_extra)
@@ -108,7 +108,7 @@ class SIFT_Algorithm:
         """
         dogs: list[list[np.ndarray]] = []
         # for each octave
-        for o in range(0, sift_params.n_oct):
+        for o in range(sift_params.n_oct):
             octave: list[np.ndarray] = scale_space[o]
             dog_row: list[np.ndarray] = []
             # for each scale level (excluding last image)
@@ -132,7 +132,7 @@ class SIFT_Algorithm:
         """
         extremas: list[SIFT_KeyPoint] = []
         # for each octave in dogs
-        for o in range(0, sift_params.n_oct):
+        for o in range(sift_params.n_oct):
             # this code generally takes the longest
             # we print a little progress indicator
             print(f"Extrema Calculation: Octave {o}")
@@ -229,7 +229,7 @@ class SIFT_Algorithm:
                     break
                 # calculate offset, this will be of shape (1,3) ([[a],[b],[c]])
                 alpha = -np.linalg.inv(hessian) * g_o_smn
-                # the every value is below the drop off of 0.6
+                # if every value is below the drop off of 0.6
                 # we found the new location
                 if(np.max(np.abs(alpha)) < 0.6):
                     # this is simplified from 'w+alphaT*g + 0.5*alphaT*H*alpha'
@@ -281,7 +281,7 @@ class SIFT_Algorithm:
         filtered_extremas: list[SIFT_KeyPoint] = []
         for extremum in extremas:
             # current location of the extremum
-            s: int = extremum.s # scaöe index
+            s: int = extremum.s # scale index
             m: int = extremum.m # x-coordinate
             n: int = extremum.n # y-coordinate
             # current dog image
@@ -330,9 +330,9 @@ class SIFT_Algorithm:
             Key is (o, s, m, n) and value is (grad_x, grad_y)
         """
         gradients: dict[Tuple[int, int, int, int], Tuple[float, float]] = {}
-        for o in range(0, sift_params.n_oct):
+        for o in range(sift_params.n_oct):
             # include all images from 0 to n_spo+2
-            for s in range(0, sift_params.n_spo+3):
+            for s in range(sift_params.n_spo+3):
                 # get current image
                 v_o_s: np.ndarray = scale_space[o][s]
                 # for each pixel in the image
@@ -397,14 +397,14 @@ class SIFT_Algorithm:
             deltas (list[float]): list of deltas for each octave
 
         Returns:
-            list[KeyPoint]: List of keypoints with assigned orientation. KeyPoint are same objects.
+            list[KeyPoint]: List of keypoints with assigned orientation. KeyPoint are new objects.
         """
         new_keypoints: list[SIFT_KeyPoint] = []
         for keypoint in keypoints:
             # current image
             image = scale_space[keypoint.o][keypoint.s]
             # as x and y are calculate in taylor expansion with m*delta or n*delta, we need to divide by delta
-            # this follow the C-implementation
+            # this follows the C-implementation
             key_x = keypoint.x / deltas[keypoint.o]
             key_y = keypoint.y / deltas[keypoint.o]
             key_sigma = keypoint.sigma / deltas[keypoint.o]
