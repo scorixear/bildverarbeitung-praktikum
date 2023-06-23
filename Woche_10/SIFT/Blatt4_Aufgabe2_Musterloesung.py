@@ -29,7 +29,7 @@ def detect_and_compute(img: NDArray[np.float32],
     scale_space, deltas, sigmas = SIFT_Algorithm.create_scale_space(img, sift_params)
     dogs = SIFT_Algorithm.create_dogs(scale_space, sift_params)
     # normalize dogs are just for visualization
-    normalized_dogs = [[cv.normalize(d, None, 0, 1, cv.NORM_MINMAX) for d in octave] for octave in dogs] # type: ignore
+    normalized_dogs: list[list[NDArray[np.float32]]] = [[cv.normalize(d, None, 0, 1, cv.NORM_MINMAX) for d in octave] for octave in dogs] # type: ignore
     discrete_extremas = SIFT_Algorithm.find_discrete_extremas(dogs, sift_params, sigmas, deltas)
     taylor_extremas = SIFT_Algorithm.taylor_expansion(discrete_extremas,
                                        dogs,
@@ -83,7 +83,7 @@ def main():
     img = cv.resize(img, (128, 104))
     # convert to gray scale
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    gray = (gray/255.).astype(np.float32)
+    gray = (gray/255.).astype(np.float32) # type: ignore
     rotated = rotate_image(gray, 45)
     sift_params = SIFT_Params()
     _, _, keypoints = detect_and_compute(gray, sift_params, show_plots=True)
