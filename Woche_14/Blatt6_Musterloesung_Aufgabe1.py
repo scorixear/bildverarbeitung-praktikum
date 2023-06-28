@@ -107,7 +107,7 @@ def main():
         for learning_rate in learning_rate_range:
             for maximum_iteration in maximum_iteration_range:
                 x_ticks = np.arange(len(layer_range))
-                save_plots(layer_range, x_ticks, df.query(f'Solver == "{solver}" & Maximum_Iteration == {maximum_iteration_range} & Learning_Rate == {learning_rate}'), "Layers", f"layers_{solver}_x_{learning_rate}_{maximum_iteration}", "Layers")
+                save_plots(layer_range, x_ticks, df.query(f'Solver == "{solver}" & Maximum_Iteration == {maximum_iteration} & Learning_Rate == {learning_rate}'), "Layers", f"layers_{solver}_x_{learning_rate}_{maximum_iteration}", "Layers")
     for layers in layer_range:
         for learning_rate in learning_rate_range:
             for maximum_iteration in maximum_iteration_range:
