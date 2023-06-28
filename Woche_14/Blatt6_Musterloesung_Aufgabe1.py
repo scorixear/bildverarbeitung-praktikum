@@ -47,15 +47,15 @@ def main():
     # learning_rate_range = [0.1]
     # maximum_iteration_range = [5]
     
-    solver_range: list[str] = [MLPSolver.Adam, MLPSolver.Momentum]
-    layer_range = [3,4]
-    learning_rate_range = [0.1, 0.01]
-    maximum_iteration_range = [5,10]
-    
-    # solver_range = [MLPSolver.Adam, MLPSolver.Momentum, MLPSolver.Standard]
-    # layer_range = [2,3,4]
+    # solver_range: list[str] = [MLPSolver.Adam, MLPSolver.Momentum]
+    # layer_range = [3,4]
     # learning_rate_range = [0.1, 0.01]
-    # maximum_iteration_range = [5, 10, 15]
+    # maximum_iteration_range = [5,10]
+    
+    solver_range = [MLPSolver.Adam, MLPSolver.Momentum, MLPSolver.Standard]
+    layer_range = [2,3,4]
+    learning_rate_range = [0.1, 0.01]
+    maximum_iteration_range = [5, 10, 15]
     
     for solver in solver_range:
         for layers in layer_range:
