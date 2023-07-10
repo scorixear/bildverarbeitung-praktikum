@@ -1,5 +1,4 @@
 from time import time
-from enum import Enum
 import sklearn.metrics as metrics
 import tensorflow
 from keras.datasets import mnist
@@ -14,6 +13,7 @@ DROPOUT = 0.2#
 ENABLE_RETRAINING = True
 
 def main():
+    now = time()
     # load in 2d images and their labels
     (train_images, train_labels), (test_images, test_labels) = mnist.load_data()
     # reshape images into 1d vectors
@@ -53,6 +53,7 @@ def main():
                 df.loc[len(df)] = [k, p, loss, accuracy, precision, recall, f1_score] # type: ignore
                 end = time() - st
                 print(f"Training finished in {end}")
+        print(f"Total time taken: {time() - now}")
         df.to_csv("Woche_15/cnn_results.csv")
     else:
         df = pd.read_csv("Woche_15/cnn_results.csv")
@@ -106,6 +107,6 @@ def set_axis(x_values, x_labels, axis, x_label, y_label):
     
         
 if __name__ == "__main__":
-    now = time()
+    
     main()
-    print(f"Total time taken: {time() - now}")
+    
