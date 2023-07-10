@@ -2,7 +2,7 @@ from time import time
 from enum import Enum
 from sklearn.neural_network import MLPClassifier
 import sklearn.metrics as metrics
-from tensorflow.keras.datasets import mnist
+from keras.datasets import mnist
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
