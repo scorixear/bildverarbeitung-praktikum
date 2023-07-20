@@ -1,7 +1,7 @@
 from time import time
 from enum import Enum
 from sklearn.neural_network import MLPClassifier
-import sklearn.metrics as metrics
+from sklearn import metrics
 from keras.datasets import mnist
 import pandas as pd
 import numpy as np
@@ -14,8 +14,8 @@ warnings.filterwarnings('ignore')
 # represent the required solvers and the possible solvers in sklearn
 class MLPSolver(str, Enum):
     Adam = "adam"
-    Momentum = "sgd"
-    Standard = "lbfgs"
+    SDG = "sgd"
+    LBFGS = "lbfgs"
     
     def __str__(self):
         return self.value
@@ -34,7 +34,7 @@ def main():
     
     # specify parameter ranges
     # Adam = adam, Momentum = sgd, Standard = lbfgs
-    solver_range = [MLPSolver.Adam, MLPSolver.Momentum, MLPSolver.Standard]
+    solver_range = [MLPSolver.Adam, MLPSolver.SDG, MLPSolver.LBFGS]
     layer_range = [2,3,4]
     learning_rate_range = [0.1, 0.01]
     maximum_iteration_range = [5, 10, 15]
@@ -52,8 +52,8 @@ def main():
                     # start measuring time
                     st = time()
                     # layers [2, 3, 4] into (100, 100,), (100, 100, 100, ) and (100, 100, 100, 100,)
-                    # 100 is the number of nerons each layer has
-                    layers = tuple([100 for _ in range(layer_num)])
+                    # 100 is the number of neurons each layer has
+                    layers = tuple(100 for _ in range(layer_num))
                     
                     # create classifier
                     mlp = MLPClassifier(hidden_layer_sizes=layers, learning_rate_init=learning_rate, max_iter=maximum_iteration, solver=solver.value)
@@ -113,7 +113,7 @@ def main():
     # results show the following:
     # lbgfs give best results, while adam performs equally good with less layers
     # 3 layers are optimum, 4 takes longer, but gives no significant improvement
-    # lbgs does like less layers
+    # lbfgs does like less layers
     # 0.01 is the best learning rate overall
     # 15 iterations are the best overall, except for adam
     # sgd is stoic in general, having no effect in layers, learning rate and maximum iteration

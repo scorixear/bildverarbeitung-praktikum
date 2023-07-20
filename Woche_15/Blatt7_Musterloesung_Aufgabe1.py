@@ -1,6 +1,6 @@
 from time import time
 import sklearn.metrics as metrics
-import tensorflow
+import tensorflow as tf
 from keras.datasets import mnist
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
@@ -42,9 +42,9 @@ def main():
                 model.add(Conv2D(28, kernel_size=(k,k), input_shape=(train_shape[1],train_shape[2],1)))
                 model.add(MaxPooling2D(pool_size=(p,p)))
                 model.add(Flatten())
-                model.add(Dense(128, activation=tensorflow.nn.relu))
+                model.add(Dense(128, activation=tf.nn.relu))
                 model.add(Dropout(DROPOUT))
-                model.add(Dense(10, activation=tensorflow.nn.softmax))
+                model.add(Dense(10, activation=tf.nn.softmax))
                 
                 
                 # train model
@@ -73,9 +73,9 @@ def main():
     else:
         df = pd.read_csv("Woche_15/cnn_results.csv")
     # show the results
-    save_plots(df)
+    show_plot(df)
 
-def save_plots(dataset: pd.DataFrame):
+def show_plot(dataset: pd.DataFrame):
     # for each kernel size [3;5]
     # collect the metrics in arrays
     loss_k = []

@@ -1,7 +1,7 @@
 from keras.datasets import mnist
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
-import tensorflow
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -30,9 +30,9 @@ def main():
         model.add(Conv2D(28, kernel_size=(KERNEL,KERNEL), input_shape=(train_shape[1],train_shape[2],1)))
         model.add(MaxPooling2D(pool_size=(POOLING,POOLING)))
         model.add(Flatten())
-        model.add(Dense(128, activation=tensorflow.nn.relu))
+        model.add(Dense(128, activation=tf.nn.relu))
         model.add(Dropout(0.2))
-        model.add(Dense(10, activation=tensorflow.nn.softmax))
+        model.add(Dense(10, activation=tf.nn.softmax))
         # and train it
         model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
         model.fit(x=train_images, y=train_labels, epochs=EPOCHS)

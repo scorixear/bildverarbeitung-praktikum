@@ -37,17 +37,17 @@ def pca(x: np.ndarray, Q: int) -> np.ndarray:
     # x is a NxD matrix, transposed to be a DxN matrix
     # top_eigenvectors is a DxQ matrix, transposed to be a QxD matrix
     # QxD * DxN = QxN, transposed to NxQ
-    Z = np.dot(top_eigenvectors.T , x.T)    
+    Z = np.dot(top_eigenvectors.T , x.T)
     return Z.T
 
 def main():
     # generate dataset
     dataset_size = 100
-    dataset_dimension = 3
+    dataset_dimension = 4
     # set seed for reproducibility
     np.random.seed(0)
     # fill dataset with random values
-    # wresults in a NxD matrix (np.ndarray)
+    # results in a NxD matrix (np.ndarray)
     dataset = np.random.randint(0, 100, (dataset_size, dataset_dimension))
     
     print("Dataset: ",dataset)
