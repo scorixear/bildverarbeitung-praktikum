@@ -80,7 +80,7 @@ def main():
                     f1_tr = metrics.f1_score(train_labels, tr_predict, average="macro")
                     
                     # and save predictions to dataframe
-                    df.loc[i] = [solver.value, layers, learning_rate, maximum_iteration, acc_tr, acc_test, prec_tr, recall_tr, f1_tr, end] # type: ignore
+                    df.loc[i] = [solver.value, layer_num, learning_rate, maximum_iteration, acc_tr, acc_test, prec_tr, recall_tr, f1_tr, end] # type: ignore
                     i = i+1
     # save results to csv
     df.to_csv("Woche_14/MLP_Results.csv")
